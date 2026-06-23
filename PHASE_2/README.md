@@ -8,19 +8,17 @@ Il tutorial è strutturato in moduli progressivi: si parte dalla comunicazione b
 ## 🗂️ Struttura del Repository
 
 ```
-mpi-cpp-tutorial/
+PHASE_2/
 │
-├── 01_point_to_point/          ← Comunicazione punto a punto
-│   ├── blocking/               ← Send/Recv bloccanti
-│   └── non_blocking/           ← Isend/Irecv non bloccanti
+├── 01_Point_to_Point/          ← Comunicazione punto a punto
+│   ├── Blocking/               ← Send/Recv bloccanti
+│   └── NonBlocking/            ← Isend/Irecv non bloccanti
 │
-├── 02_communicators/           ← Communicator e gruppi MPI
+├── 03_Collective/              ← Comunicazione collettiva
 │
-├── 03_collective/              ← Comunicazione collettiva
-│
-└── 04_topologies/              ← Topologie virtuali e Jacobi
-    ├── virtual_topologies/     ← MPI_Cart_create e derivati
-    └── jacobi_2d/              ← Solver iterativo 2D
+└── 04_Topologies/              ← Topologie virtuali e Jacobi
+    ├── Virtual_Topologies/     ← MPI_Cart_create e derivati
+    └── Jacobi/                 ← Solver iterativo 2D
 ```
 
 ---
@@ -31,7 +29,6 @@ mpi-cpp-tutorial/
 |---|-----------|-----------|
 | [01a](./01_point_to_point/blocking/) | **Blocking P2P** | `MPI_Send`, `MPI_Recv`, deadlock, ping-pong |
 | [01b](./01_point_to_point/non_blocking/) | **Non-Blocking P2P** | `MPI_Isend`, `MPI_Irecv`, `MPI_Wait`, `MPI_Waitall` |
-| [02](./02_communicators/) | **Communicators** | `MPI_Comm_split`, gruppi, rank locali |
 | [03](./03_collective/) | **Collective** | Bcast, Scatter/Gather, Reduce, Allreduce, Alltoall |
 | [04a](./04_topologies/virtual_topologies/) | **Virtual Topologies** | `MPI_Cart_create`, `MPI_Cart_shift`, `MPI_Sendrecv` |
 | [04b](./04_topologies/jacobi_2d/) | **Jacobi 2D** | Halo exchange, convergenza, decomposizione di dominio |
