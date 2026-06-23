@@ -1,4 +1,4 @@
-# 00b — C++ vs Fortran per HPC: Benchmark e Analisi Comparativa
+# 00. C++ vs Fortran per HPC: Benchmark e Analisi Comparativa
 
 > Questo documento risponde alla domanda concreta: **vale la pena riscrivere codice Fortran in C++, e cosa ci guadagno/perdo in termini di performance?**
 
