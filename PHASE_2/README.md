@@ -1,124 +1,199 @@
-# 📡 MPI in C++ — Tutorial Progressivo
+# 📡 MPI in C++ for High Performance Computing
 
-Un percorso didattico completo sulla programmazione parallela con **MPI (Message Passing Interface)** in C++.  
-Il tutorial è strutturato in moduli progressivi: si parte dalla comunicazione base tra due processi e si arriva alle topologie virtuali e al solutore iterativo di Jacobi.
+## Overview
+
+This repository collects a set of progressively advanced examples and case studies on parallel programming with **MPI (Message Passing Interface)** in C++.
+
+The material covers the fundamental communication paradigms of distributed-memory systems, including point-to-point and collective communications, virtual topologies, domain decomposition techniques, and the implementation of an iterative Jacobi solver. Particular attention is devoted to concepts commonly encountered in High Performance Computing (HPC) applications such as halo exchange, synchronization, scalability, and performance analysis.
+
+The repository is organized as a sequence of thematic modules, each focusing on a specific aspect of MPI programming and accompanied by theoretical notes, commented source code, and representative execution outputs.
 
 ---
 
-## 🗂️ Struttura del Repository
+## 🗂️ Repository Structure
 
-```
+```text
 PHASE_2/
 │
 ├── 00_Intro/                   ← Introduzione programmazione parallela C++ 
 │
-├── 01_Point_to_Point/          ← Comunicazione punto a punto
-│   ├── Blocking/               ← Send/Recv bloccanti
-│   └── NonBlocking/            ← Isend/Irecv non bloccanti
+├── 00_Intro/                    ← Scientific Computing, HPC concepts and
+│                                  Fortran vs C++ considerations
 │
-├── 02_Collective/              ← Comunicazione collettiva
+├── 01_Point_to_Point/           ← Point-to-point communication
+│   ├── Blocking/                ← MPI_Send / MPI_Recv
+│   └── NonBlocking/             ← MPI_Isend / MPI_Irecv
 │
-├── 03_Topologies/              ← Topologie virtuali e Jacobi
+├── 03_Collective/              ← Comunicazione collettiva
+│
+└── 04_Topologies/              ← Topologie virtuali e Jacobi
     ├── Virtual_Topologies/     ← MPI_Cart_create e derivati
     └── Jacobi/                 ← Solver iterativo 2D
-│
-└── 04_Benchmark/              ← Fortran vs C++
 ```
 
 ---
 
-## 📚 Moduli
+## 📚 Contents
 
-| # | Argomento | Contenuto |
-|---|-----------|-----------|
-| [01a](./01_point_to_point/blocking/) | **Blocking P2P** | `MPI_Send`, `MPI_Recv`, deadlock, ping-pong |
-| [01b](./01_point_to_point/non_blocking/) | **Non-Blocking P2P** | `MPI_Isend`, `MPI_Irecv`, `MPI_Wait`, `MPI_Waitall` |
-| [03](./03_collective/) | **Collective** | Bcast, Scatter/Gather, Reduce, Allreduce, Alltoall |
-| [04a](./04_topologies/virtual_topologies/) | **Virtual Topologies** | `MPI_Cart_create`, `MPI_Cart_shift`, `MPI_Sendrecv` |
-| [04b](./04_topologies/jacobi_2d/) | **Jacobi 2D** | Halo exchange, convergenza, decomposizione di dominio |
+| Module | Topic                                     | Main Concepts                                                      |
+| ------ | ----------------------------------------- | ------------------------------------------------------------------ |
+| 00     | Introduction                              | HPC fundamentals, Scientific Computing, Fortran vs C++             |
+| 01a    | Blocking Point-to-Point Communication     | MPI_Send, MPI_Recv, deadlock avoidance, ping-pong benchmark        |
+| 01b    | Non-Blocking Point-to-Point Communication | MPI_Isend, MPI_Irecv, MPI_Wait, MPI_Waitall, communication overlap |
+| 02     | Collective Communication                  | Broadcast, Scatter, Gather, Reduce, Allreduce, Alltoall            |
+| 03a    | Virtual Topologies                        | MPI_Cart_create, MPI_Cart_shift, MPI_Sendrecv, Cartesian grids     |
+| 03b    | Distributed Jacobi Solver                 | Domain decomposition, halo exchange, convergence detection         |
+| 04     | Benchmarking and Performance Analysis     | Scalability, speedup, efficiency, Fortran vs C++ discussion        |
 
 ---
 
-## ⚙️ Prerequisiti
+## ⚙️ Software Requirements
 
-### Compilatore e librerie
+### MPI Implementation
+
+The examples can be compiled using either MPICH or OpenMPI.
+
+### Ubuntu / Debian
+
 ```bash
-# Ubuntu/Debian
 sudo apt install mpich build-essential
+```
 
-# oppure con OpenMPI
+or
+
+```bash
 sudo apt install libopenmpi-dev openmpi-bin
 ```
 
-### Compilazione (template generale)
+---
+
+## Compilation
+
+Generic compilation template:
+
 ```bash
-mpicxx -O2 -Wall -o programma programma.cpp
-mpirun -np 4 ./programma
+mpicxx -O2 -Wall -o program program.cpp
 ```
 
-> **Nota:** `mpicxx` è il wrapper C++ per MPI. Internamente chiama `g++` aggiungendo automaticamente i flag di include e linking per la libreria MPI.
+Execution example:
+
+```bash
+mpirun -np 4 ./program
+```
+
+The `mpicxx` compiler wrapper automatically provides the required include paths and MPI libraries during compilation and linking.
 
 ---
 
-## 🧠 Concetti Fondamentali MPI
+## MPI Programming Model
 
-### Inizializzazione e terminazione
+MPI follows the **SPMD (Single Program Multiple Data)** paradigm:
+
+* A single executable is launched on multiple processes.
+* Each process owns a unique identifier called **rank**.
+* Processes cooperate by exchanging messages through MPI communication routines.
+* Every process executes the same source code while following different execution paths according to its rank.
+
+Example:
+
 ```cpp
 #include <mpi.h>
 #include <iostream>
 
-int main(int argc, char* argv[]) {
-    MPI_Init(&argc, &argv);          // Inizializza MPI
+int main(int argc, char* argv[])
+{
+    MPI_Init(&argc, &argv);
 
     int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);  // Rank del processo corrente
-    MPI_Comm_size(MPI_COMM_WORLD, &size);  // Numero totale di processi
 
-    std::cout << "Sono il processo " << rank
-              << " di " << size << std::endl;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    MPI_Finalize();  // Chiude MPI
+    std::cout << "Process " << rank
+              << " of " << size << std::endl;
+
+    MPI_Finalize();
+
     return 0;
 }
 ```
 
-### Il modello SPMD
-MPI segue il paradigma **SPMD (Single Program, Multiple Data)**:
-- **Un solo sorgente**, eseguito da tutti i processi contemporaneamente.
-- Ogni processo ha un proprio **rank** (identificatore intero, da 0 a size-1).
-- La logica si differenzia con `if (rank == 0) { ... } else { ... }`.
+---
 
-### Tipi di dato MPI più comuni
-| Tipo C++     | Tipo MPI          |
-|--------------|-------------------|
-| `int`        | `MPI_INT`         |
-| `double`     | `MPI_DOUBLE`      |
-| `float`      | `MPI_FLOAT`       |
-| `char`       | `MPI_CHAR`        |
-| `long`       | `MPI_LONG`        |
+## Common MPI Datatypes
+
+| C++ Type  | MPI Datatype  |
+| --------- | ------------- |
+| int       | MPI_INT       |
+| double    | MPI_DOUBLE    |
+| float     | MPI_FLOAT     |
+| char      | MPI_CHAR      |
+| long      | MPI_LONG      |
+| long long | MPI_LONG_LONG |
 
 ---
 
-## 🗺️ Percorso Consigliato
+## Educational Path
 
-```
-01a Blocking  →  01b Non-Blocking  →  02 Communicators
-                                            ↓
-                               03 Collective Communication
-                                            ↓
-                          04a Virtual Topologies  →  04b Jacobi 2D
+The repository follows a progression from basic communication mechanisms to more advanced distributed algorithms:
+
+```text
+Introduction
+      ↓
+Blocking Point-to-Point
+      ↓
+Non-Blocking Point-to-Point
+      ↓
+Collective Communication
+      ↓
+Virtual Topologies
+      ↓
+Domain Decomposition
+      ↓
+Jacobi Solver
+      ↓
+Performance Analysis
 ```
 
-Ogni modulo contiene:
-- 📖 **README** con spiegazione teorica
-- 💻 **Esercizi commentati** in C++
-- ✅ **Output atteso** per verificare la correttezza
+Each module contains:
+
+* Theoretical background
+* Commented C++ implementations
+* Representative execution examples
+* References to the relevant MPI concepts
 
 ---
 
-## 📎 Riferimenti
+## Performance Analysis
 
-- [MPI Standard 4.1](https://www.mpi-forum.org/docs/)
-- [MPICH Documentation](https://www.mpich.org/documentation/guides/)
-- [Open MPI FAQ](https://www.open-mpi.org/faq/)
-- Pacheco, *An Introduction to Parallel Programming*, Morgan Kaufmann
+The final section includes benchmark-oriented material focused on:
+
+* Execution time measurements
+* Communication overhead evaluation
+* Strong scaling analysis
+* Speedup computation
+
+[
+S(p) = \frac{T_1}{T_p}
+]
+
+where (T_1) is the serial execution time and (T_p) is the execution time using (p) processes.
+
+Efficiency is computed as:
+
+[
+E(p) = \frac{S(p)}{p}
+]
+
+These metrics are applied to the distributed Jacobi solver to evaluate scalability.
+
+---
+
+## References
+
+* MPI Forum, *MPI Standard 4.1*
+* William Gropp, Ewing Lusk, Anthony Skjellum, *Using MPI*
+* Peter Pacheco, *An Introduction to Parallel Programming*
+* Open MPI Documentation
+* MPICH Documentation
+* Intel oneAPI HPC Toolkit Documentation
