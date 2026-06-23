@@ -15,8 +15,6 @@ The repository is organized as a sequence of thematic modules, each focusing on 
 ```text
 PHASE_2/
 │
-├── 00_Intro/                   ← Introduzione programmazione parallela C++ 
-│
 ├── 00_Intro/                    ← Scientific Computing, HPC concepts and
 │                                  Fortran vs C++ considerations
 │
@@ -24,11 +22,13 @@ PHASE_2/
 │   ├── Blocking/                ← MPI_Send / MPI_Recv
 │   └── NonBlocking/             ← MPI_Isend / MPI_Irecv
 │
-├── 03_Collective/              ← Comunicazione collettiva
+├── 02_Collective/               ← Collective communication primitives
 │
-└── 04_Topologies/              ← Topologie virtuali e Jacobi
-    ├── Virtual_Topologies/     ← MPI_Cart_create e derivati
-    └── Jacobi/                 ← Solver iterativo 2D
+├── 03_Topologies/
+│   ├── Virtual_Topologies/      ← Cartesian communicators and neighbor discovery
+│   └── Jacobi/                  ← Distributed Jacobi solver
+│
+└── 04_Benchmark/                ← Performance analysis and language comparison
 ```
 
 ---
