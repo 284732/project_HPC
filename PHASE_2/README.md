@@ -183,9 +183,9 @@ where (T_1) is the serial execution time and (T_p) is the execution time using (
 
 Efficiency is computed as:
 
-$
+$$
 E(p) = \frac{S(p)}{p}
-$
+$$
 
 These metrics are applied to the distributed Jacobi solver to evaluate scalability.
 
