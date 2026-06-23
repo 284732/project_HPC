@@ -10,15 +10,19 @@ Il tutorial è strutturato in moduli progressivi: si parte dalla comunicazione b
 ```
 PHASE_2/
 │
+├── 00_Intro/                   ← Introduzione programmazione parallela C++ 
+│
 ├── 01_Point_to_Point/          ← Comunicazione punto a punto
 │   ├── Blocking/               ← Send/Recv bloccanti
 │   └── NonBlocking/            ← Isend/Irecv non bloccanti
 │
-├── 03_Collective/              ← Comunicazione collettiva
+├── 02_Collective/              ← Comunicazione collettiva
 │
-└── 04_Topologies/              ← Topologie virtuali e Jacobi
+├── 03_Topologies/              ← Topologie virtuali e Jacobi
     ├── Virtual_Topologies/     ← MPI_Cart_create e derivati
     └── Jacobi/                 ← Solver iterativo 2D
+│
+└── 04_Benchmark/              ← Fortran vs C++
 ```
 
 ---
