@@ -1,0 +1,2 @@
+Integral estimation : 3.14169
+Computational time : 26114 ms.
