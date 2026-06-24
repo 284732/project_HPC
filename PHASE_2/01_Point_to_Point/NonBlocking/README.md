@@ -1,80 +1,102 @@
-# 01b — Comunicazione Point-to-Point Non Bloccante
+# 01b — Non-Blocking Point-to-Point Communication
 
-## Teoria
+## Theory
 
-Le operazioni **non bloccanti** restituiscono il controllo immediatamente, permettendo al processo di continuare a lavorare mentre la comunicazione avviene in background. La completezza dell'operazione viene verificata in un secondo momento.
+**Non-blocking** operations return control immediately, allowing the process to continue working while the communication takes place in the background. Completion of the operation is checked at a later time.
 
-### Il pattern generale
+### The General Pattern
 
 ```
-MPI_Isend / MPI_Irecv   →  avvia l'operazione (torna subito)
-         [lavoro utile]  →  computa qualcosa mentre i dati viaggiano
-MPI_Wait / MPI_Waitall   →  aspetta che l'operazione sia terminata
+MPI_Isend / MPI_Irecv   →  start the operation (returns immediately)
+         [useful work]  →  compute something while data is in transit
+MPI_Wait / MPI_Waitall  →  wait until the operation has completed
 ```
 
-### MPI_Isend e MPI_Irecv
+### MPI_Isend and MPI_Irecv
 
 ```cpp
-MPI_Request request;  // handle che identifica l'operazione in corso
+MPI_Request request;  // handle identifying the ongoing operation
 
-// Avvia invio non bloccante
+// Start a non-blocking send
 MPI_Isend(buf, count, datatype, dest, tag, comm, &request);
 
-// Avvia ricezione non bloccante
+// Start a non-blocking receive
 MPI_Irecv(buf, count, datatype, source, tag, comm, &request);
 
-// ... computa qualcosa ...
+// ... perform some computation ...
 
-// Aspetta il completamento
+// Wait for completion
 MPI_Wait(&request, MPI_STATUS_IGNORE);
 ```
 
-> ⚠️ **Importante**: non accedere al buffer tra `MPI_Isend`/`MPI_Irecv` e `MPI_Wait`! Il contenuto è "in uso" da MPI.
+> ⚠️ **Important**: do not access the buffer between `MPI_Isend`/`MPI_Irecv` and `MPI_Wait`! The buffer contents are "in use" by MPI.
 
-### Funzioni di completamento
+### Completion Functions
 
-| Funzione | Descrizione |
-|----------|-------------|
-| `MPI_Wait(&req, &status)` | Blocca finché `req` è completa |
-| `MPI_Waitall(n, reqs[], statuses[])` | Aspetta che **tutte** le `n` richieste siano complete |
-| `MPI_Waitany(n, reqs[], &idx, &status)` | Aspetta che **almeno una** sia completa |
-| `MPI_Test(&req, &flag, &status)` | Non bloccante: controlla se è completa (flag = 0/1) |
+| Function                                | Description                                                |
+| --------------------------------------- | ---------------------------------------------------------- |
+| `MPI_Wait(&req, &status)`               | Blocks until `req` is complete                             |
+| `MPI_Waitall(n, reqs[], statuses[])`    | Waits until **all** `n` requests are complete              |
+| `MPI_Waitany(n, reqs[], &idx, &status)` | Waits until **at least one** request is complete           |
+| `MPI_Test(&req, &flag, &status)`        | Non-blocking: checks whether it is complete (`flag = 0/1`) |
 
-### Vantaggio: Overlap Computazione-Comunicazione
+### Advantage: Computation–Communication Overlap
 
+```text
+Time →
+────────────────────────────────────────────────────────
+
+Blocking version:
+|---- Send ----|---- Receive ----|---- Computation ----|
+Total execution time ≈ 3T
+
+Non-blocking version:
+| Isend/Irecv |
+|---- Computation ----|
+                    | Wait |
+Total execution time ≈ T + communication overhead
 ```
-Bloccante:  [Send████████][Recv████████][Computa████████]
-                                              totale: 3T
 
-Non-bloccante: [Isend][Computa████████][Wait][Irecv][Wait]
-                           totale: T + overhead
+In the blocking case, communication and computation occur one after the other.
+
+In the non-blocking case, communication progresses in the background while useful computation is performed. The waiting time at the end is often much smaller than the communication time itself, because part of the communication has already completed during computation.
+
+Therefore:
+
+```text
+Blocking:      Tsend + Trecv + Tcompute
+Non-blocking:  max(Tcommunication, Tcompute)
+               + synchronization overhead
 ```
 
-Nei problemi reali (Jacobi, FFT distribuita, ecc.) il vantaggio può essere significativo.
+When computation and communication have comparable costs, the overlap can significantly reduce the total execution time.
+
+
+## Exercises
+
+### Exercise 1 — Basic Isend/Irecv (`ex1_nonblocking_basic.cpp`)
+
+Reimplementation of the ping-pong example using non-blocking operations.
+
+### Exercise 2 — Compute-Communicate Overlap (`ex2_overlap.cpp`)
+
+Compute a local sum while sending data to a neighbor. Compare execution times.
+
+### Exercise 3 — Waitall with Multiple Communications (`ex3_waitall.cpp`)
+
+The master launches N non-blocking sends simultaneously, then waits using `MPI_Waitall`.
 
 ---
 
-## Esercizi
+## Expected Output
 
-### Esercizio 1 — Isend/Irecv base (`ex1_nonblocking_basic.cpp`)
-Riscrittura del ping-pong con operazioni non bloccanti.
+### ex3_waitall (with 4 processes)
 
-### Esercizio 2 — Overlap compute-communicate (`ex2_overlap.cpp`)
-Calcola una somma locale mentre invia dati al vicino. Confronta i tempi.
-
-### Esercizio 3 — Waitall con comunicazioni multiple (`ex3_waitall.cpp`)
-Il master lancia N invii non bloccanti contemporaneamente, poi aspetta con `MPI_Waitall`.
-
----
-
-## Output Atteso
-
-### ex3_waitall (con 4 processi)
-```
-[Master] Avvio 3 Isend non bloccanti...
-[Master] Faccio altro lavoro mentre i dati viaggiano...
-[Master] MPI_Waitall: tutte le comunicazioni completate.
-[Worker 1] Ricevuto: 100
-[Worker 2] Ricevuto: 200
-[Worker 3] Ricevuto: 300
+```text
+[Master] Starting 3 non-blocking Isend operations...
+[Master] Doing other work while the data is in transit...
+[Master] MPI_Waitall: all communications completed.
+[Worker 1] Received: 100
+[Worker 2] Received: 200
+[Worker 3] Received: 300
 ```
