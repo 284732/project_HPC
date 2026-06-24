@@ -1,19 +1,20 @@
 // =============================================================
-// ESERCIZIO 2 — MPI_Scatter + MPI_Gather: somma distribuita
+// EXERCISE 2 — MPI_Scatter + MPI_Gather: Distributed Sum
 // =============================================================
-// Il root ha un vettore di N elementi (N multiplo di size).
-// Lo scattera: ogni processo riceve N/size elementi.
-// Ogni worker calcola la somma della propria parte.
-// Il root raccoglie i risultati con Gather.
+// The root process owns a vector of N elements
+// (N must be a multiple of size).
+// It scatters the vector: each process receives N/size elements.
+// Each worker computes the sum of its own portion.
+// The root collects the results using Gather.
 //
-// Compilazione:  mpicxx -O2 -Wall -o ex2_scatter ex2_scatter_gather.cpp
-// Esecuzione:    mpirun -np 4 ./ex2_scatter
+// Compilation:  mpicxx -O2 -Wall -o ex2_scatter ex2_scatter_gather.cpp
+// Execution:    mpirun -np 4 ./ex2_scatter
 // =============================================================
 
 #include <mpi.h>
 #include <iostream>
 #include <vector>
-#include <numeric>   // per std::iota e std::accumulate
+#include <numeric>   // for std::iota and std::accumulate
 #include <iomanip>
 
 int main(int argc, char* argv[]) {
@@ -23,83 +24,108 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    const int N = 12;  // dimensione totale (deve essere multiplo di size)
+    const int N = 12;  // total size (must be a multiple of size)
 
     if (N % size != 0) {
         if (rank == 0)
-            std::cerr << "ERRORE: N=" << N << " non è multiplo di size=" << size << std::endl;
+            std::cerr << "ERROR: N=" << N
+                      << " is not a multiple of size="
+                      << size << std::endl;
         MPI_Finalize();
         return 1;
     }
 
-    int chunk = N / size;  // quanti elementi riceve ogni processo
+    int chunk = N / size;  // number of elements received by each process
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PASSO 1: Il root inizializza il vettore globale
+    // STEP 1: The root initializes the global vector
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    std::vector<double> vettore_globale;  // solo il root lo riempie
+    std::vector<double> global_vector;  // only the root fills it
+
     if (rank == 0) {
-        vettore_globale.resize(N);
-        for (int i = 0; i < N; i++) vettore_globale[i] = i + 1.0;  // 1,2,...,N
+        global_vector.resize(N);
 
-        std::cout << "Vettore globale: ";
-        for (double x : vettore_globale) std::cout << x << " ";
+        for (int i = 0; i < N; i++)
+            global_vector[i] = i + 1.0;  // 1,2,...,N
+
+        std::cout << "Global vector: ";
+        for (double x : global_vector) std::cout << x << " ";
         std::cout << "\n";
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PASSO 2: Scatter → ogni processo riceve 'chunk' elementi
+    // STEP 2: Scatter → each process receives 'chunk' elements
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    std::vector<double> mia_parte(chunk);
+    std::vector<double> my_part(chunk);
 
     // MPI_Scatter(sendbuf, sendcount, sendtype,
     //             recvbuf, recvcount, recvtype, root, comm)
-    // - sendcount: quanti elementi inviare A CIASCUN processo
-    // - recvcount: quanti elementi riceve ogni processo (= sendcount)
+    // - sendcount: number of elements sent TO EACH process
+    // - recvcount: number of elements received by each process (= sendcount)
     MPI_Scatter(
-        vettore_globale.data(), chunk, MPI_DOUBLE,  // sorgente (solo root usa questo)
-        mia_parte.data(),       chunk, MPI_DOUBLE,  // destinazione (tutti)
+        global_vector.data(), chunk, MPI_DOUBLE,  // source (used only by root)
+        my_part.data(),       chunk, MPI_DOUBLE,  // destination (all processes)
         0, MPI_COMM_WORLD
     );
 
-    std::cout << "[Processo " << rank << "] ho ricevuto: ";
-    for (double x : mia_parte) std::cout << x << " ";
+    std::cout << "[Process " << rank << "] received: ";
+    for (double x : my_part) std::cout << x << " ";
     std::cout << std::endl;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PASSO 3: Ogni processo elabora la propria parte
+    // STEP 3: Each process processes its own portion
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    double somma_locale = 0.0;
-    for (double x : mia_parte) somma_locale += x * x;  // somma dei quadrati
+    double local_sum = 0.0;
+    for (double x : my_part)
+        local_sum += x * x;  // sum of squares
 
-    std::cout << "[Processo " << rank << "] somma quadrati locale = "
-              << somma_locale << std::endl;
+    std::cout << "[Process " << rank
+              << "] local sum of squares = "
+              << local_sum << std::endl;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PASSO 4: Gather → root raccoglie tutti i risultati
+    // STEP 4: Gather → root collects all results
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    std::vector<double> risultati(size);  // solo il root lo usa
+    std::vector<double> results(size);  // only the root uses it
 
-    // MPI_Gather: ognuno invia 1 double, il root riceve size double
+    // MPI_Gather: each process sends 1 double,
+    // the root receives 'size' doubles
     MPI_Gather(
-        &somma_locale, 1, MPI_DOUBLE,  // cosa invia ciascuno
-        risultati.data(), 1, MPI_DOUBLE,  // dove il root raccoglie
+        &local_sum, 1, MPI_DOUBLE,          // what each process sends
+        results.data(), 1, MPI_DOUBLE,      // where the root collects
         0, MPI_COMM_WORLD
     );
 
     if (rank == 0) {
-        double totale = 0.0;
-        std::cout << "\n[Root] Risultati raccolti:\n";
-        for (int i = 0; i < size; i++) {
-            std::cout << "  Processo " << i << ": " << risultati[i] << "\n";
-            totale += risultati[i];
-        }
-        std::cout << "Somma totale quadrati = " << totale << "\n";
+        double total = 0.0;
 
-        // Verifica: somma(i^2) per i=1..N = N(N+1)(2N+1)/6
-        double atteso = static_cast<double>(N) * (N+1) * (2*N+1) / 6.0;
-        std::cout << "Valore atteso          = " << atteso << "\n";
-        std::cout << (std::abs(totale - atteso) < 1e-9 ? "✓ CORRETTO" : "✗ ERRORE") << "\n";
+        std::cout << "\n[Root] Collected results:\n";
+
+        for (int i = 0; i < size; i++) {
+            std::cout << "  Process "
+                      << i
+                      << ": "
+                      << results[i]
+                      << "\n";
+            total += results[i];
+        }
+
+        std::cout << "Total sum of squares = "
+                  << total << "\n";
+
+        // Verification:
+        // sum(i^2) for i = 1..N = N(N+1)(2N+1)/6
+        double expected =
+            static_cast<double>(N) * (N + 1) * (2 * N + 1) / 6.0;
+
+        std::cout << "Expected value       = "
+                  << expected << "\n";
+
+        std::cout
+            << (std::abs(total - expected) < 1e-9
+                    ? "✓ CORRECT"
+                    : "✗ ERROR")
+            << "\n";
     }
 
     MPI_Finalize();

@@ -1,110 +1,77 @@
-# 03 — Comunicazione Collettiva
+// =============================================================
+// EXERCISE 1 — MPI_Bcast + MPI_Reduce: Distributed PI Computation
+// =============================================================
+// Process 0 broadcasts the number of terms N.
+// Each process computes a portion of the Leibniz series:
+//   PI/4 = 1 - 1/3 + 1/5 - 1/7 + ...
+// The partial results are summed using MPI_Reduce.
+//
+// Compilation:  mpicxx -O2 -Wall -o ex1_pi ex1_bcast_pi.cpp
+// Execution:    mpirun -np 4 ./ex1_pi
+// =============================================================
 
-## Teoria
+#include <mpi.h>
+#include <iostream>
+#include <cmath>
+#include <iomanip>
 
-Le operazioni collettive coinvolgono **tutti** i processi di un communicator simultaneamente. Sono più efficienti delle equivalenti P2P (usano algoritmi ad albero, pipeline, ecc.) e semplificano il codice.
+int main(int argc, char* argv[]) {
+    MPI_Init(&argc, &argv);
 
-> ⚠️ **Regola fondamentale**: ogni processo nel communicator **deve** chiamare la stessa funzione collettiva. Non c'è un mittente e un destinatario: tutti partecipano.
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
----
+    long long N = 10000000LL;  // total number of terms in the series
 
-### Panoramica delle operazioni
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // STEP 1: The root broadcasts N to everyone
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // All processes call MPI_Bcast: the root sends, the others receive.
+    // The root is the process with rank = 0.
+    MPI_Bcast(&N, 1, MPI_LONG_LONG, 0, MPI_COMM_WORLD);
 
-```
-MPI_Bcast      → 1 processo invia a tutti
-MPI_Scatter    → 1 processo distribuisce parti a ciascuno
-MPI_Gather     → tutti inviano al processo root che li raccoglie
-MPI_Allgather  → tutti raccolgono da tutti
-MPI_Reduce     → tutti contribuiscono, root ottiene il risultato
-MPI_Allreduce  → tutti contribuiscono, TUTTI ottengono il risultato
-MPI_Alltoall   → ogni processo invia dati diversi a ogni altro
-MPI_Barrier    → sincronizzazione: tutti aspettano che tutti arrivino
-```
+    if (rank == 0)
+        std::cout << "[Root] N = " << N
+                  << ", broadcast to all processes.\n";
 
----
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // STEP 2: Each process computes its own portion
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // Decomposition: process i computes terms
+    // i, i+size, i+2*size, ...
+    double local_sum = 0.0;
 
-### MPI_Bcast
+    for (long long k = rank; k < N; k += size) {
+        // Term k of the Leibniz series: (-1)^k / (2k+1)
+        double term = 1.0 / (2.0 * k + 1.0);
+        if (k % 2 == 0)
+            local_sum += term;
+        else
+            local_sum -= term;
+    }
 
-```
-Prima:  Proc 0 [X]  Proc 1 [?]  Proc 2 [?]  Proc 3 [?]
-                  ↓
-Dopo:   Proc 0 [X]  Proc 1 [X]  Proc 2 [X]  Proc 3 [X]
-```
-```cpp
-MPI_Bcast(buf, count, datatype, root, comm);
-// root: chi ha il dato iniziale (il "mittente" della broadcast)
-// tutti gli altri ricevono in buf
-```
+    std::cout << "[Process " << rank << "] partial sum = "
+              << std::setprecision(10) << local_sum << std::endl;
 
-### MPI_Scatter / MPI_Gather
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // STEP 3: Reduction: sum all partial sums
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    double total_sum = 0.0;
+    MPI_Reduce(&local_sum, &total_sum, 1, MPI_DOUBLE,
+               MPI_SUM, 0, MPI_COMM_WORLD);
 
-```
-Scatter:
-  Root [A B C D]  →  Proc 0:[A]  Proc 1:[B]  Proc 2:[C]  Proc 3:[D]
+    if (rank == 0) {
+        double approximated_pi = 4.0 * total_sum;
+        double error = std::abs(approximated_pi - M_PI);
 
-Gather:
-  Proc 0:[A]  Proc 1:[B]  Proc 2:[C]  Proc 3:[D]  →  Root [A B C D]
-```
-```cpp
-MPI_Scatter(sendbuf, sendcount, sendtype,
-            recvbuf, recvcount, recvtype, root, comm);
+        std::cout << "\n=== Result ===\n";
+        std::cout << std::setprecision(12);
+        std::cout << "Approximated PI = " << approximated_pi << "\n";
+        std::cout << "Actual PI       = " << M_PI << "\n";
+        std::cout << "Absolute error  = " << error << "\n";
+    }
 
-MPI_Gather(sendbuf, sendcount, sendtype,
-           recvbuf, recvcount, recvtype, root, comm);
-```
-
-### MPI_Reduce
-
-```
-Proc 0:[2]  Proc 1:[5]  Proc 2:[3]  Proc 3:[1]
-              ↓  MPI_SUM
-            Root:[11]
-```
-
-**Operazioni di riduzione disponibili:**
-
-| Costante MPI   | Operazione      |
-|----------------|-----------------|
-| `MPI_SUM`      | somma           |
-| `MPI_PROD`     | prodotto        |
-| `MPI_MAX`      | massimo         |
-| `MPI_MIN`      | minimo          |
-| `MPI_LAND`     | AND logico      |
-| `MPI_LOR`      | OR logico       |
-| `MPI_MAXLOC`   | max + indice    |
-| `MPI_MINLOC`   | min + indice    |
-
-```cpp
-MPI_Reduce(sendbuf, recvbuf, count, datatype, op, root, comm);
-MPI_Allreduce(sendbuf, recvbuf, count, datatype, op, comm);
-// Allreduce: tutti ottengono il risultato, non solo root
-```
-
----
-
-## Esercizi
-
-### Esercizio 1 — Bcast e calcolo del PI (`ex1_bcast_pi.cpp`)
-Il root brodacast i parametri, ogni worker calcola una parte del PI con la serie di Leibniz, poi si fa una Reduce finale.
-
-### Esercizio 2 — Scatter/Gather: somma distribuita (`ex2_scatter_gather.cpp`)
-Il root ha un vettore grande. Lo scattera, ogni worker elabora la propria parte, si fa il gather del risultato.
-
-### Esercizio 3 — Allreduce: norma distribuita (`ex3_allreduce.cpp`)
-Ogni processo ha un vettore locale. Calcola la norma L2 globale con Allreduce (tutti ottengono il risultato).
-
-### Esercizio 4 — Alltoall: trasposizione distribuita (`ex4_alltoall.cpp`)
-Ogni processo invia dati diversi a ogni altro processo: base della FFT distribuita.
-
----
-
-## Output Atteso
-
-### ex1_bcast_pi (4 processi)
-```
-[Root] N_termini = 1000000, broadcaster a tutti.
-[Processo 0] Calcolo termini 0..249999
-[Processo 1] Calcolo termini 250000..499999
-...
-PI approssimato = 3.14159265...  (errore: 9.3e-7)
-```
+    MPI_Finalize();
+    return 0;
+}
