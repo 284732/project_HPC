@@ -4,7 +4,7 @@
 // Il processo 0 (master) invia una stringa a tutti gli altri.
 // Ogni processo slave la riceve e la stampa con il proprio rank.
 //
-// Compilazione:  mpicxx -O2 -Wall -o ex1_hello ex1_hello.cpp
+// Compilazione:  mpicxx -O2 -o ex1_hello ex1_hello.cpp
 // Esecuzione:    mpirun -np 4 ./ex1_hello
 // =============================================================
 

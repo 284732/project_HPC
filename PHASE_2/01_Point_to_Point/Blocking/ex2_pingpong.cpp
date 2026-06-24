@@ -5,7 +5,7 @@
 // Misura la latenza media usando MPI_Wtime().
 //
 // Usa esattamente 2 processi:
-// Compilazione:  mpicxx -O2 -Wall -o ex2_pingpong ex2_pingpong.cpp
+// Compilazione:  mpicxx -O2 -o ex2_pingpong ex2_pingpong.cpp
 // Esecuzione:    mpirun -np 2 ./ex2_pingpong
 // =============================================================
 
@@ -70,7 +70,11 @@ int main(int argc, char* argv[]) {
         std::cout << "  Tempo totale:        " << tempo_totale << " s\n";
         std::cout << "  Tempo per ping-pong: " << (tempo_totale / N_ITER) * 1e6 << " µs\n";
         std::cout << "  Latenza stimata:     " << latenza_us << " µs\n";
-        std::cout << "  Valore finale:       " << valore << " (atteso: " << 2.0*N_ITER - 1 << ")\n";
+        std::cout << "  Valore finale:       "
+          << valore
+          << " (atteso: "
+          << N_ITER
+          << ")\n";
     }
 
     MPI_Finalize();
