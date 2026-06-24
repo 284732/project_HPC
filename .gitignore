@@ -1,0 +1,28 @@
+# Binari compilati (aggiungiamo i nomi degli eseguibili)
+ex1_hello
+ex2_pingpong
+ex3_deadlock
+ex4_ring
+ex1_nonblocking
+ex2_overlap
+ex3_waitall
+ex1_split
+ex2_grid
+ex3_group
+ex1_pi
+ex2_scatter
+ex3_allreduce
+ex4_alltoall
+ex1_cart
+ex2_halo
+ex3_dims
+jacobi1d
+jacobi2d
+
+# Generici
+*.o
+*.out
+a.out
+core
+*.swp
+.DS_Store
