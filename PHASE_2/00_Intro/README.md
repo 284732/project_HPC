@@ -1,143 +1,240 @@
-# 00 — Introduzione: C++ per HPC e il confronto con Python
+# 00 — Introduction: C++ for High Performance Computing
 
-## Contesto: perché questo tutorial esiste
+## Motivation
 
-Il tuo collega ha costruito una fase di HPC in **Python** usando NumPy, SciPy e `mpi4py`.  
-Questo tutorial fa la stessa cosa in **C++**, che è il punto di arrivo naturale di quel percorso:
-Python con NumPy/SciPy è potente perché sotto il cofano chiama librerie scritte in **C e Fortran**.  
-In C++ quelle librerie si chiamano direttamente, senza lo strato Python in mezzo.
+High Performance Computing (HPC) applications require the efficient use of modern hardware resources, including multicore CPUs, vector units, accelerators, and distributed-memory clusters.
 
----
+Among the programming languages commonly adopted in scientific computing, C++ occupies a central role thanks to its combination of:
 
-## Il problema di Python che questo tutorial risolve
+* High execution performance
+* Direct control over memory management
+* Compatibility with established numerical libraries
+* Native support for parallel programming models
+* Scalability from small applications to large scientific codes
 
-Il notebook del tuo collega identifica due bottleneck di Python puro:
-
-| Problema Python | Soluzione Python (SciPy) | Soluzione C++ |
-|----------------|--------------------------|---------------|
-| Oggetti `PyObject` pesanti, memoria frammentata | `numpy.ndarray` — blocco contiguo di memoria | `std::vector<double>` — contiguo per definizione |
-| GIL blocca il multithreading | Operazioni vettorizzate escono dal GIL | Non esiste GIL: thread reali, SIMD nativo |
-| Loop Python lenti | Vectorization → C/Fortran backend | Il loop C++ compila direttamente in istruzioni CPU |
-| mpi4py overhead (pickling) | `comm.Send()` uppercase → buffer diretto | `MPI_Send()` — direttamente sul buffer, zero overhead |
+This repository focuses on distributed-memory parallel programming using MPI and provides a collection of examples implemented entirely in modern C++.
 
 ---
 
-## La mappa dei concetti: Python → C++
+## Why C++ for Scientific Computing?
 
-### Memoria e array
+Scientific applications are often characterized by:
 
-```python
-# Python (NumPy)
-import numpy as np
-x = np.array([1.0, 2.0, 3.0], dtype=np.float64)  # blocco contiguo
-```
+* Large numerical datasets
+* Intensive floating-point computations
+* Strict memory requirements
+* Long execution times
+
+To address these challenges, HPC software relies on languages capable of producing highly optimized machine code.
+
+Modern C++ provides:
+
+* Compile-time optimization
+* Automatic vectorization
+* Fine-grained memory control
+* Generic programming through templates
+* Access to optimized numerical libraries
+
+As a result, C++ is widely used in computational physics, computational fluid dynamics, finite element analysis, machine learning infrastructures, and large-scale simulation frameworks.
+
+---
+
+## Memory Layout and Numerical Arrays
+
+Efficient memory access is one of the key factors affecting performance.
+
+A contiguous memory layout improves:
+
+* Cache utilization
+* Memory bandwidth efficiency
+* SIMD vectorization opportunities
+
+Example using `std::vector`:
 
 ```cpp
-// C++: stesso layout, nessuna libreria esterna necessaria
 #include <vector>
-std::vector<double> x = {1.0, 2.0, 3.0};  // contiguo in memoria
-// oppure, per array raw come MPI si aspetta:
+
+std::vector<double> x = {1.0, 2.0, 3.0};
+```
+
+The elements are stored contiguously in memory, making the structure suitable for numerical kernels and MPI communications.
+
+Raw arrays are also frequently used:
+
+```cpp
 double x[3] = {1.0, 2.0, 3.0};
 ```
 
-> In C++ l'array è **sempre** contiguo. Non c'è il problema di Python list vs ndarray:
-> in C++ non esiste una lista di puntatori — `std::vector<double>` è già il formato "NumPy".
+Both representations can be passed directly to MPI communication routines.
 
 ---
 
-### Linear Algebra: NumPy/LAPACK → chiamata diretta
+## Numerical Libraries
 
-```python
-# Python: numpy chiama LAPACK sotto
-import numpy as np
-A = np.array([[4., -2.], [1., 5.]])
-eigenvalues, _ = np.linalg.eig(A)
-```
+Modern scientific applications rarely implement numerical algorithms from scratch.
+
+Instead, they rely on highly optimized libraries such as:
+
+| Library   | Purpose                                |
+| --------- | -------------------------------------- |
+| BLAS      | Basic linear algebra operations        |
+| LAPACK    | Dense linear algebra                   |
+| ScaLAPACK | Distributed linear algebra             |
+| FFTW      | Fast Fourier Transform                 |
+| PETSc     | Scientific computing framework         |
+| Trilinos  | Numerical simulation framework         |
+| Eigen     | Header-only C++ linear algebra library |
+| Armadillo | High-level linear algebra library      |
+
+Example using Eigen:
 
 ```cpp
-// C++: chiami LAPACK direttamente (o usi Eigen, libreria header-only)
-// Con Eigen (comune in HPC moderno):
 #include <Eigen/Dense>
+
 Eigen::Matrix2d A;
-A << 4, -2, 1, 5;
+
+A << 4, -2,
+     1,  5;
+
 Eigen::EigenSolver<Eigen::Matrix2d> solver(A);
+
 auto eigenvalues = solver.eigenvalues();
 ```
 
-In C++ non hai bisogno di SciPy come intermediario — puoi linkare BLAS/LAPACK direttamente,
-oppure usare librerie header-only come **Eigen** o **Armadillo**.
+These libraries provide performance comparable to hand-written implementations while significantly reducing development effort.
 
 ---
 
-### MPI: mpi4py → MPI nativo in C++
+## Fortran and C++ in HPC
 
-Questo è il confronto più importante per questo tutorial:
+Fortran remains one of the most important languages in scientific computing due to its long history and extensive ecosystem of numerical software.
 
-| Concetto | Python `mpi4py` | C++ MPI |
-|----------|----------------|---------|
-| Import | `from mpi4py import MPI` | `#include <mpi.h>` |
-| Init | automatico all'import | `MPI_Init(&argc, &argv)` |
-| Finalize | automatico | `MPI_Finalize()` |
-| Communicator | `MPI.COMM_WORLD` | `MPI_COMM_WORLD` |
-| Rank | `comm.Get_rank()` | `MPI_Comm_rank(MPI_COMM_WORLD, &rank)` |
-| Size | `comm.Get_size()` | `MPI_Comm_size(MPI_COMM_WORLD, &size)` |
-| Send bloccante | `comm.Send(buf, dest, tag)` | `MPI_Send(buf, count, type, dest, tag, comm)` |
-| Recv bloccante | `comm.Recv(buf, source, tag)` | `MPI_Recv(buf, count, type, src, tag, comm, &status)` |
-| Send non-bloccante | `comm.Isend(buf, dest, tag)` | `MPI_Isend(buf, count, type, dest, tag, comm, &req)` |
-| Wait | `req.wait()` | `MPI_Wait(&req, &status)` |
-| Bcast | `comm.Bcast(buf, root)` | `MPI_Bcast(buf, count, type, root, comm)` |
-| Scatter | `comm.Scatter(send, recv, root)` | `MPI_Scatter(send, sc, t, recv, rc, t, root, comm)` |
-| Gather | `comm.Gather(send, recv, root)` | `MPI_Gather(send, sc, t, recv, rc, t, root, comm)` |
-| Reduce | `comm.Reduce(send, recv, op, root)` | `MPI_Reduce(send, recv, n, t, op, root, comm)` |
-| Allreduce | `comm.Allreduce(send, recv, op)` | `MPI_Allreduce(send, recv, n, t, op, comm)` |
+Modern C++, however, achieves comparable performance while offering additional abstraction mechanisms and software engineering tools.
 
-**Differenza chiave:** in Python il tipo del dato è inferito dall'array NumPy.
-In C++ devi specificarlo esplicitamente (`MPI_DOUBLE`, `MPI_INT`, ecc.) — ma questo
-ti dà controllo totale sul layout di memoria, zero overhead di serializzazione.
+### Memory Ordering
 
----
+A notable difference concerns multidimensional arrays:
 
-## Il "Two-Language Problem" risolto
+| Language | Memory Layout |
+| -------- | ------------- |
+| Fortran  | Column-major  |
+| C/C++    | Row-major     |
 
-Il collega ha identificato un limite di Python+SciPy:
+Fortran:
 
-> *"If a SciPy routine crashes deep inside its Fortran backend, Python might just throw
-> a generic Segmentation Fault without a clear traceback."*
-
-In C++ questo problema non esiste: scrivi e debuggi nello stesso linguaggio che esegue.
-Il compilatore (`g++`, `icpx`) ti dà errori a compile-time, AddressSanitizer a runtime,
-`gdb` per il debug — tutto sullo stesso codice.
-
----
-
-## Cosa **non** hai in C++ rispetto a Python
-
-Essere onesti è importante:
-
-| Feature Python | Equivalente C++ | Costo |
-|---------------|-----------------|-------|
-| Plot con Matplotlib | gnuplot, matplotlib-cpp, salva CSV e plotta fuori | più verboso |
-| Jupyter Notebook interattivo | nessun equivalente nativo | devi ricompilare |
-| `scipy.fft` in una riga | FFTW (libreria C, molto più veloce) | richiede linking |
-| Prototipazione rapida | — | C++ è più lento da scrivere |
-
-Per un workflow HPC reale il trade-off è: **meno velocità di sviluppo, massima velocità di esecuzione**.
-Per la ricerca spesso si usa Python per esplorare e C++/Fortran per produzione.
-
----
-
-## Come si legge questo tutorial rispetto al progetto del tuo collega
-
-```
-Collega (Python)              Questo tutorial (C++)
-─────────────────────         ──────────────────────────────
-Notebook 1: NumPy/SciPy   →  Questo README (00_intro)
-Notebook 2: mpi4py P2P    →  01_point_to_point/
-Notebook 2: mpi4py Coll.  →  03_collective/
-Notebook 2: mpi4py Comm.  →  02_communicators/
-(non presente)             →  04_topologies/ (Jacobi 2D)
+```fortran
+real :: A(100,100)
+A(i,j)
 ```
 
-Il modulo sulle topologie (griglia cartesiana + Jacobi) è un'aggiunta rispetto
-al progetto Python — riflette il fatto che in C++ si arriva più facilmente
-a implementare algoritmi numerici completi come il solutore di Laplace.
+C++:
+
+```cpp
+double A[100][100];
+A[i][j];
+```
+
+Understanding memory ordering is important because traversal patterns directly influence cache efficiency.
+
+### Performance
+
+For numerical kernels, performance is typically determined more by:
+
+* Compiler quality
+* Optimization flags
+* Memory access patterns
+* Vectorization
+
+than by the language itself.
+
+Common optimization flags include:
+
+```bash
+-O3 -march=native
+```
+
+Under equivalent optimization conditions, modern Fortran and C++ implementations often exhibit comparable performance.
+
+---
+
+## MPI and Distributed-Memory Parallelism
+
+While shared-memory parallelism relies on threads, MPI enables communication between independent processes, potentially distributed across multiple nodes of a cluster.
+
+The MPI execution model is based on:
+
+* Multiple processes
+* Explicit message passing
+* Distributed memory
+* SPMD (Single Program Multiple Data)
+
+Every process executes the same source code while operating on different portions of the data.
+
+Example:
+
+```cpp
+#include <mpi.h>
+#include <iostream>
+
+int main(int argc, char* argv[])
+{
+    MPI_Init(&argc, &argv);
+
+    int rank;
+    int size;
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    std::cout << "Process "
+              << rank
+              << " of "
+              << size
+              << std::endl;
+
+    MPI_Finalize();
+
+    return 0;
+}
+```
+
+MPI forms the foundation of most large-scale HPC applications and remains the dominant standard for distributed-memory parallel programming.
+
+---
+
+## Repository Roadmap
+
+The material is organized according to increasing levels of complexity:
+
+```text
+Introduction
+      ↓
+Blocking Point-to-Point Communication
+      ↓
+Non-Blocking Point-to-Point Communication
+      ↓
+Collective Communication
+      ↓
+Virtual Topologies
+      ↓
+Domain Decomposition
+      ↓
+Distributed Jacobi Solver
+      ↓
+Performance Analysis
+```
+
+The final modules combine communication primitives and numerical algorithms to demonstrate realistic HPC workflows based on domain decomposition and iterative solvers.
+
+---
+
+## Learning Objectives
+
+After completing this section, the reader should be able to:
+
+* Understand the role of C++ in High Performance Computing
+* Recognize the importance of memory locality and data layout
+* Use numerical libraries commonly adopted in scientific applications
+* Understand the differences between Fortran and C++ in HPC environments
+* Interpret the MPI programming model
+* Prepare for the distributed-memory examples presented in the subsequent modules

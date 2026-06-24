@@ -173,17 +173,19 @@ The final section includes benchmark-oriented material focused on:
 * Strong scaling analysis
 * Speedup computation
 
-[
+
+$$
 S(p) = \frac{T_1}{T_p}
-]
+$$
+
 
 where (T_1) is the serial execution time and (T_p) is the execution time using (p) processes.
 
 Efficiency is computed as:
 
-[
+$$
 E(p) = \frac{S(p)}{p}
-]
+$$
 
 These metrics are applied to the distributed Jacobi solver to evaluate scalability.
 
