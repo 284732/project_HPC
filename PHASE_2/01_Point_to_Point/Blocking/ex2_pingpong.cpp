@@ -30,7 +30,8 @@ int main(int argc, char* argv[]) {
     }
 
     const int N_ITER = 100;   // numero di ping-pong
-    const int TAG    = 10;
+    const int TAG_com1    = 10;
+    const int TAG_com2    = 20;
     double valore    = 0.0;   // il dato che viaggia avanti e indietro
 
     double t_start, t_end;
@@ -43,15 +44,15 @@ int main(int argc, char* argv[]) {
 
         if (rank == 0) {
             // --- Processo 0: invia poi riceve ---
-            valore = static_cast<double>(i);
-            MPI_Send(&valore, 1, MPI_DOUBLE, 1, TAG, MPI_COMM_WORLD);
-            MPI_Recv(&valore, 1, MPI_DOUBLE, 1, TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            valore = static_cast<double>(i);    // Trasforma i da intero a double 
+            MPI_Send(&valore, 1, MPI_DOUBLE, 1, TAG_com1, MPI_COMM_WORLD);
+            MPI_Recv(&valore, 1, MPI_DOUBLE, 1, TAG_com2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         } else {
             // --- Processo 1: riceve, incrementa, reinvia ---
-            MPI_Recv(&valore, 1, MPI_DOUBLE, 0, TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(&valore, 1, MPI_DOUBLE, 0, TAG_com1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             valore += 1.0;  // modifica il valore prima di rimandarlo
-            MPI_Send(&valore, 1, MPI_DOUBLE, 0, TAG, MPI_COMM_WORLD);
+            MPI_Send(&valore, 1, MPI_DOUBLE, 0, TAG_com2, MPI_COMM_WORLD);
         }
     }
 

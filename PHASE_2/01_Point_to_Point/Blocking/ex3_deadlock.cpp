@@ -17,17 +17,16 @@
 // Entrambi i processi tentano di inviare prima di ricevere.
 // MPI_Send può bloccarsi se il buffer interno è pieno.
 // → Deadlock garantito per messaggi grandi (oltre il buffer eager).
-//
-// void versione_deadlock(int rank) {
-//     double buf_send = rank;
-//     double buf_recv = -1.0;
-//     int altro = 1 - rank;  // 0→1, 1→0
-//
-//     MPI_Send(&buf_send, 1, MPI_DOUBLE, altro, 0, MPI_COMM_WORLD);  // ← BLOCCA?
-//     MPI_Recv(&buf_recv, 1, MPI_DOUBLE, altro, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-//
-//     std::cout << "Processo " << rank << " ha ricevuto: " << buf_recv << std::endl;
-// }
+void versione_deadlock(int rank) {
+    double buf_send = rank;
+    double buf_recv = -1.0;
+    int altro = 1 - rank;  // 0→1, 1→0
+
+    MPI_Send(&buf_send, 1, MPI_DOUBLE, altro, 0, MPI_COMM_WORLD);  // ← BLOCCA?
+    MPI_Recv(&buf_recv, 1, MPI_DOUBLE, altro, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    std::cout << "Processo " << rank << " ha ricevuto: " << buf_recv << std::endl;
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // VERSIONE 2 — SOLUZIONE: Ordinare Send/Recv
@@ -65,9 +64,9 @@ void versione_sendrecv(int rank) {
     double buf_recv = -1.0;
     int altro = 1 - rank;
 
-    // MPI_Sendrecv(sendbuf, sendcount, sendtype, dest,   sendtag,
-    //              recvbuf, recvcount, recvtype, source, recvtag,
-    //              comm, status)
+    MPI_Sendrecv(sendbuf, sendcount, sendtype, dest,   sendtag,
+                 recvbuf, recvcount, recvtype, source, recvtag,
+                 comm, status)
     MPI_Sendrecv(
         &buf_send, 1, MPI_DOUBLE, altro, 0,    // send
         &buf_recv, 1, MPI_DOUBLE, altro, 0,    // recv
