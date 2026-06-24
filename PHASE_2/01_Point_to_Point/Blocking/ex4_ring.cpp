@@ -1,13 +1,14 @@
 // =============================================================
-// ESERCIZIO 4 — Ring Communication (comunicazione ad anello)
+// EXERCISE 4 — Ring Communication
 // =============================================================
-// Ogni processo invia un token al successivo:
+// Each process sends a token to the next one:
 //   rank → (rank+1) % size
-// Il processo 0 inizia con token=0, ogni passaggio lo incrementa.
-// Alla fine, il processo 0 riceve il token passato da tutti.
+// Process 0 starts with token=0, and each process increments it.
+// At the end, process 0 receives the token after it has passed
+// through all processes.
 //
-// Compilazione:  mpicxx -O2 -Wall -o ex4_ring ex4_ring.cpp
-// Esecuzione:    mpirun -np 4 ./ex4_ring
+// Compilation:  mpicxx -O2 -Wall -o ex4_ring ex4_ring.cpp
+// Execution:    mpirun -np 4 ./ex4_ring
 // =============================================================
 
 #include <mpi.h>
@@ -20,43 +21,46 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    // Rank del vicino a sinistra (da cui ricevo) e a destra (a cui invio)
-    int sinistra = (rank - 1 + size) % size;  // chi mi invia
-    int destra   = (rank + 1) % size;          // a chi invio
+    // Rank of the left neighbor (from whom I receive)
+    // and right neighbor (to whom I send)
+    int left  = (rank - 1 + size) % size;  // who sends to me
+    int right = (rank + 1) % size;         // whom I send to
 
     int token = 0;
     const int TAG = 99;
 
     if (rank == 0) {
         // -------------------------------------------------------
-        // Processo 0: parte con token=0, invia a destra,
-        // aspetta che torni dall'ultimo processo (sinistra = size-1)
+        // Process 0: starts with token=0, sends to the right,
+        // waits for it to return from the last process
+        // (left = size-1)
         // -------------------------------------------------------
         token = 0;
-        std::cout << "Processo 0: inizio con token = " << token
-                  << ", invio al processo " << destra << std::endl;
+        std::cout << "Process 0: starting with token = " << token
+                  << ", sending to process " << right << std::endl;
 
-        MPI_Send(&token, 1, MPI_INT, destra, TAG, MPI_COMM_WORLD);
-        MPI_Recv(&token, 1, MPI_INT, sinistra, TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Send(&token, 1, MPI_INT, right, TAG, MPI_COMM_WORLD);
+        MPI_Recv(&token, 1, MPI_INT, left, TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        std::cout << "Processo 0: token finale ricevuto = " << token << std::endl;
-        std::cout << "Valore atteso: " << size - 1 << std::endl;
-        std::cout << (token == size - 1 ? "✓ CORRETTO" : "✗ ERRORE") << std::endl;
+        std::cout << "Process 0: final token received = " << token << std::endl;
+        std::cout << "Expected value: " << size - 1 << std::endl;
+        std::cout << (token == size - 1 ? "✓ CORRECT" : "✗ ERROR") << std::endl;
 
     } else {
         // -------------------------------------------------------
-        // Processi 1..size-1: ricevono, incrementano, reinviano
+        // Processes 1..size-1: receive, increment, resend
         // -------------------------------------------------------
-        MPI_Recv(&token, 1, MPI_INT, sinistra, TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(&token, 1, MPI_INT, left, TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        std::cout << "Processo " << rank << ": ricevuto token = " << token
-                  << " da processo " << sinistra;
+        std::cout << "Process " << rank << ": received token = " << token
+                  << " from process " << left;
 
-        token += 1;  // ogni processo aggiunge 1 al token
+        token += 1;  // each process adds 1 to the token
 
-        std::cout << ", invio " << token << " al processo " << destra << std::endl;
+        std::cout << ", sending " << token
+                  << " to process " << right << std::endl;
 
-        MPI_Send(&token, 1, MPI_INT, destra, TAG, MPI_COMM_WORLD);
+        MPI_Send(&token, 1, MPI_INT, right, TAG, MPI_COMM_WORLD);
     }
 
     MPI_Finalize();

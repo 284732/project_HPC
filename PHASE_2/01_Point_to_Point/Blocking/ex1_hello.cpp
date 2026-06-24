@@ -1,78 +1,79 @@
 // =============================================================
-// ESERCIZIO 1 — Hello con MPI_Send / MPI_Recv
+// EXERCISE 1 — Hello with MPI_Send / MPI_Recv
 // =============================================================
-// Il processo 0 (master) invia una stringa a tutti gli altri.
-// Ogni processo slave la riceve e la stampa con il proprio rank.
+// Process 0 (master) sends a string to all other processes.
+// Each slave process receives it and prints it together with
+// its own rank.
 //
-// Compilazione:  mpicxx -O2 -o ex1_hello ex1_hello.cpp
-// Esecuzione:    mpirun -np 4 ./ex1_hello
+// Compilation:  mpicxx -O2 -o ex1_hello ex1_hello.cpp
+// Execution:    mpirun -np 4 ./ex1_hello
 // =============================================================
 
 #include <mpi.h>
 #include <iostream>
-#include <cstring>   // per strlen
+#include <cstring>   // for strlen
 
 int main(int argc, char* argv[]) {
 
-    // --- Inizializzazione MPI ---
+    // --- MPI initialization ---
     MPI_Init(&argc, &argv);
 
     int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);  // chi sono io?
-    MPI_Comm_size(MPI_COMM_WORLD, &size);  // quanti siamo in totale?
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);  // who am I?
+    MPI_Comm_size(MPI_COMM_WORLD, &size);  // total number of processes
 
-    // Buffer per il messaggio (abbastanza grande per tutti i processi)
+    // Message buffer (large enough for all processes)
     const int MAX_LEN = 64;
-    char messaggio[MAX_LEN];
+    char message[MAX_LEN];
 
-    // TAG scelto arbitrariamente per identificare questo tipo di messaggio
-    const int TAG_SALUTO = 42;
+    // TAG chosen arbitrarily to identify this message type
+    const int TAG_GREETING = 42;
 
     if (rank == 0) {
         // -------------------------------------------------------
-        // MASTER: costruisce il messaggio e lo invia a tutti
+        // MASTER: builds the message and sends it to everyone
         // -------------------------------------------------------
-        snprintf(messaggio, MAX_LEN, "Ciao dal processo 0!");
+        snprintf(message, MAX_LEN, "Hello from process 0!");
 
         for (int dest = 1; dest < size; dest++) {
-            // MPI_Send(buffer, count, tipo, destinatario, tag, communicator)
+            // MPI_Send(buffer, count, datatype, destination, tag, communicator)
             MPI_Send(
-                messaggio,        // cosa inviare
-                strlen(messaggio) + 1,  // lunghezza incluso '\0'
-                MPI_CHAR,         // tipo degli elementi
-                dest,             // rank destinatario
-                TAG_SALUTO,       // tag
-                MPI_COMM_WORLD    // communicator globale
+                message,              // data to send
+                strlen(message) + 1,  // length including '\0'
+                MPI_CHAR,             // element type
+                dest,                 // destination rank
+                TAG_GREETING,         // tag
+                MPI_COMM_WORLD        // global communicator
             );
         }
 
-        std::cout << "[Processo 0] Ho inviato il saluto a "
-                  << (size - 1) << " processi." << std::endl;
+        std::cout << "[Process 0] I sent the greeting to "
+                  << (size - 1) << " processes." << std::endl;
 
     } else {
         // -------------------------------------------------------
-        // SLAVE: riceve il messaggio dal processo 0
+        // SLAVE: receives the message from process 0
         // -------------------------------------------------------
-        MPI_Status status;  // struttura con info sul messaggio ricevuto
+        MPI_Status status;  // structure containing received message info
 
-        // MPI_Recv(buffer, count_max, tipo, sorgente, tag, comm, &status)
+        // MPI_Recv(buffer, max_count, datatype, source, tag, comm, &status)
         MPI_Recv(
-            messaggio,    // dove salvare i dati
-            MAX_LEN,      // dimensione massima del buffer
+            message,        // where to store the data
+            MAX_LEN,        // maximum buffer size
             MPI_CHAR,
-            0,            // ricevo solo dal processo 0
-            TAG_SALUTO,   // accetto solo messaggi con questo tag
+            0,              // receive only from process 0
+            TAG_GREETING,   // accept only messages with this tag
             MPI_COMM_WORLD,
-            &status       // info sul messaggio (mittente, tag, lunghezza)
+            &status         // message information (sender, tag, length)
         );
 
-        // status.MPI_SOURCE dice chi ha inviato il messaggio
-        std::cout << "[Processo " << rank << "] Messaggio ricevuto da "
-                  << status.MPI_SOURCE << ": \"" << messaggio << "\""
+        // status.MPI_SOURCE tells who sent the message
+        std::cout << "[Process " << rank << "] Message received from "
+                  << status.MPI_SOURCE << ": \"" << message << "\""
                   << std::endl;
     }
 
-    // --- Sincronizzazione finale (facoltativa ma utile per output pulito) ---
+    // --- Final synchronization (optional but useful for clean output) ---
     MPI_Barrier(MPI_COMM_WORLD);
 
     MPI_Finalize();

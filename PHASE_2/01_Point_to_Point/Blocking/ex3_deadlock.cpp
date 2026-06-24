@@ -1,81 +1,81 @@
 // =============================================================
-// ESERCIZIO 3 — Deadlock: causa e soluzioni
+// EXERCISE 3 — Deadlock: Causes and Solutions
 // =============================================================
-// Dimostra il deadlock classico e tre modi per risolverlo.
-// Decommenta la versione da testare (una per volta).
+// Demonstrates the classic deadlock and three ways to solve it.
+// Uncomment the version you want to test (one at a time).
 //
-// Compilazione:  mpicxx -O2 -Wall -o ex3_deadlock ex3_deadlock.cpp
-// Esecuzione:    mpirun -np 2 ./ex3_deadlock
+// Compilation:  mpicxx -O2 -Wall -o ex3_deadlock ex3_deadlock.cpp
+// Execution:    mpirun -np 2 ./ex3_deadlock
 // =============================================================
 
 #include <mpi.h>
 #include <iostream>
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// VERSIONE 1 — DEADLOCK (NON decommettare in produzione!)
+// VERSION 1 — DEADLOCK (DO NOT uncomment in production!)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Entrambi i processi tentano di inviare prima di ricevere.
-// MPI_Send può bloccarsi se il buffer interno è pieno.
-// → Deadlock garantito per messaggi grandi (oltre il buffer eager).
-void versione_deadlock(int rank) {
+// Both processes attempt to send before receiving.
+// MPI_Send may block if the internal buffer is full.
+// → Deadlock guaranteed for large messages (beyond the eager buffer).
+void version_deadlock(int rank) {
     double buf_send = rank;
     double buf_recv = -1.0;
-    int altro = 1 - rank;  // 0→1, 1→0
+    int other = 1 - rank;  // 0→1, 1→0
 
-    MPI_Send(&buf_send, 1, MPI_DOUBLE, altro, 0, MPI_COMM_WORLD);  // ← BLOCCA?
-    MPI_Recv(&buf_recv, 1, MPI_DOUBLE, altro, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Send(&buf_send, 1, MPI_DOUBLE, other, 0, MPI_COMM_WORLD);  // ← BLOCKS?
+    MPI_Recv(&buf_recv, 1, MPI_DOUBLE, other, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-    std::cout << "Processo " << rank << " ha ricevuto: " << buf_recv << std::endl;
+    std::cout << "Process " << rank << " received: " << buf_recv << std::endl;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// VERSIONE 2 — SOLUZIONE: Ordinare Send/Recv
+// VERSION 2 — SOLUTION: Order Send/Recv
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Un processo fa Send prima, l'altro fa Recv prima.
-// Non c'è più circolarità → nessun deadlock.
-void versione_ordinata(int rank) {
+// One process performs Send first, the other performs Recv first.
+// No circular dependency remains → no deadlock.
+void version_ordered(int rank) {
     double buf_send = static_cast<double>(rank) * 10.0;
     double buf_recv = -1.0;
-    int altro = 1 - rank;
+    int other = 1 - rank;
 
     if (rank == 0) {
-        // Processo 0: prima invia, poi riceve
-        MPI_Send(&buf_send, 1, MPI_DOUBLE, altro, 0, MPI_COMM_WORLD);
-        MPI_Recv(&buf_recv, 1, MPI_DOUBLE, altro, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        // Process 0: send first, then receive
+        MPI_Send(&buf_send, 1, MPI_DOUBLE, other, 0, MPI_COMM_WORLD);
+        MPI_Recv(&buf_recv, 1, MPI_DOUBLE, other, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     } else {
-        // Processo 1: prima riceve, poi invia
-        MPI_Recv(&buf_recv, 1, MPI_DOUBLE, altro, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        MPI_Send(&buf_send, 1, MPI_DOUBLE, altro, 0, MPI_COMM_WORLD);
+        // Process 1: receive first, then send
+        MPI_Recv(&buf_recv, 1, MPI_DOUBLE, other, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Send(&buf_send, 1, MPI_DOUBLE, other, 0, MPI_COMM_WORLD);
     }
 
-    std::cout << "[Ordinata] Processo " << rank
-              << " ha ricevuto: " << buf_recv
-              << " (atteso: " << static_cast<double>(altro) * 10.0 << ")"
+    std::cout << "[Ordered] Process " << rank
+              << " received: " << buf_recv
+              << " (expected: " << static_cast<double>(other) * 10.0 << ")"
               << std::endl;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// VERSIONE 3 — SOLUZIONE: MPI_Sendrecv
+// VERSION 3 — SOLUTION: MPI_Sendrecv
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// MPI_Sendrecv combina Send e Recv in un'unica chiamata atomica.
-// L'implementazione MPI gestisce internamente l'ordine → no deadlock.
-void versione_sendrecv(int rank) {
+// MPI_Sendrecv combines Send and Recv into a single atomic call.
+// The MPI implementation handles the ordering internally → no deadlock.
+void version_sendrecv(int rank) {
     double buf_send = static_cast<double>(rank) * 10.0;
     double buf_recv = -1.0;
-    int altro = 1 - rank;
+    int other = 1 - rank;
 
     MPI_Sendrecv(sendbuf, sendcount, sendtype, dest,   sendtag,
                  recvbuf, recvcount, recvtype, source, recvtag,
                  comm, status)
     MPI_Sendrecv(
-        &buf_send, 1, MPI_DOUBLE, altro, 0,    // send
-        &buf_recv, 1, MPI_DOUBLE, altro, 0,    // recv
+        &buf_send, 1, MPI_DOUBLE, other, 0,    // send
+        &buf_recv, 1, MPI_DOUBLE, other, 0,    // receive
         MPI_COMM_WORLD, MPI_STATUS_IGNORE
     );
 
-    std::cout << "[Sendrecv] Processo " << rank
-              << " ha ricevuto: " << buf_recv
-              << " (atteso: " << static_cast<double>(altro) * 10.0 << ")"
+    std::cout << "[Sendrecv] Process " << rank
+              << " received: " << buf_recv
+              << " (expected: " << static_cast<double>(other) * 10.0 << ")"
               << std::endl;
 }
 
@@ -89,20 +89,20 @@ int main(int argc, char* argv[]) {
 
     if (size != 2) {
         if (rank == 0)
-            std::cerr << "ERRORE: Usa esattamente 2 processi!" << std::endl;
+            std::cerr << "ERROR: Use exactly 2 processes!" << std::endl;
         MPI_Finalize();
         return 1;
     }
 
-    if (rank == 0) std::cout << "\n--- Versione con Send/Recv ordinati ---\n";
+    if (rank == 0) std::cout << "\n--- Version with ordered Send/Recv ---\n";
     MPI_Barrier(MPI_COMM_WORLD);
-    versione_ordinata(rank);
+    version_ordered(rank);
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    if (rank == 0) std::cout << "\n--- Versione con MPI_Sendrecv ---\n";
+    if (rank == 0) std::cout << "\n--- Version with MPI_Sendrecv ---\n";
     MPI_Barrier(MPI_COMM_WORLD);
-    versione_sendrecv(rank);
+    version_sendrecv(rank);
 
     MPI_Finalize();
     return 0;
