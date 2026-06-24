@@ -11,7 +11,7 @@ Process 0                          Process 1
     │                                  │
     │  MPI_Send(buf, count, type,      │
     │           dest=1, tag, comm)     │
-    │ ─────────────────────────────►  │
+    │ ─────────────────────────────►   │
     │                                  │  MPI_Recv(buf, count, type,
     │                                  │           src=0, tag, comm, &status)
 ```
