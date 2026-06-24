@@ -1,13 +1,13 @@
-# 01a — Comunicazione Point-to-Point Bloccante
+# 01a — Blocking Point-to-Point Communication
 
-## Teoria
+## Theory
 
-La comunicazione **point-to-point** (P2P) è la forma più elementare di scambio di messaggi in MPI: un processo **mittente** invia dati a un processo **destinatario** specifico.
+Point-to-point (P2P) communication is the most basic form of message exchange in MPI: a **sender** process transmits data to a specific **receiver** process.
 
-### MPI_Send e MPI_Recv
+### MPI_Send and MPI_Recv
 
-```
-Processo 0                        Processo 1
+```text
+Process 0                          Process 1
     │                                  │
     │  MPI_Send(buf, count, type,      │
     │           dest=1, tag, comm)     │
@@ -16,94 +16,149 @@ Processo 0                        Processo 1
     │                                  │           src=0, tag, comm, &status)
 ```
 
-#### Firma di MPI_Send
+#### MPI_Send Prototype
+
 ```cpp
 int MPI_Send(
-    const void* buf,      // puntatore al buffer da inviare
-    int         count,    // numero di elementi
-    MPI_Datatype datatype,// tipo MPI degli elementi
-    int         dest,     // rank del destinatario
-    int         tag,      // etichetta del messaggio (intero >= 0)
-    MPI_Comm    comm      // communicator (di solito MPI_COMM_WORLD)
+    const void* buf,       // pointer to the send buffer
+    int         count,     // number of elements
+    MPI_Datatype datatype, // MPI datatype of the elements
+    int         dest,      // destination rank
+    int         tag,       // message tag (integer >= 0)
+    MPI_Comm    comm       // communicator (usually MPI_COMM_WORLD)
 );
 ```
 
-#### Firma di MPI_Recv
+#### MPI_Recv Prototype
+
 ```cpp
 int MPI_Recv(
-    void*        buf,     // buffer dove ricevere i dati
-    int          count,   // numero massimo di elementi
+    void*        buf,      // buffer where data will be received
+    int          count,    // maximum number of elements
     MPI_Datatype datatype,
-    int          source,  // rank del mittente (o MPI_ANY_SOURCE)
-    int          tag,     // tag atteso (o MPI_ANY_TAG)
+    int          source,   // sender rank (or MPI_ANY_SOURCE)
+    int          tag,      // expected tag (or MPI_ANY_TAG)
     MPI_Comm     comm,
-    MPI_Status*  status   // informazioni sul messaggio ricevuto
+    MPI_Status*  status    // information about the received message
 );
 ```
 
-### Semantica "bloccante"
+### Blocking Semantics
 
-- `MPI_Send` **blocca** il mittente finché il buffer può essere riutilizzato in sicurezza (non necessariamente finché il destinatario ha ricevuto).
-- `MPI_Recv` **blocca** il destinatario finché il messaggio è stato completamente ricevuto nel buffer.
+* `MPI_Send` blocks the sender until the send buffer can be safely reused (not necessarily until the receiver has processed the message).
+* `MPI_Recv` blocks the receiver until the message has been completely transferred into the receive buffer.
 
-> ⚠️ **Deadlock**: se tutti i processi eseguono `MPI_Send` prima di `MPI_Recv`, nessuno è pronto a ricevere → stallo garantito.
+> ⚠️ **Deadlock:** if all processes execute `MPI_Send` before posting a matching `MPI_Recv`, no process may be ready to receive, leading to a deadlock.
+
+### MPI_Barrier: A Blocking Synchronization Operation
+
+MPI also provides blocking operations that are not point-to-point communications.
+
+```cpp
+MPI_Barrier(MPI_COMM_WORLD);
+```
+
+A barrier forces all processes in a communicator to synchronize:
+
+* A process entering the barrier waits.
+* The call returns only when every process in the communicator has reached the same barrier.
+* No data is exchanged between specific sender/receiver pairs.
+
+For this reason, `MPI_Barrier` is classified as a **blocking collective synchronization operation**, not as a point-to-point communication primitive.
 
 ### MPI_Status
 
-La struttura `MPI_Status` contiene informazioni sul messaggio ricevuto:
+The `MPI_Status` structure contains information about the received message:
+
 ```cpp
 MPI_Status status;
-// Dopo MPI_Recv:
-status.MPI_SOURCE  // rank effettivo del mittente
-status.MPI_TAG     // tag effettivo del messaggio
-// Per sapere quanti elementi sono stati ricevuti:
+
+// After MPI_Recv:
+status.MPI_SOURCE;  // actual sender rank
+status.MPI_TAG;     // actual message tag
+
+// Determine how many elements were received:
 int count;
 MPI_Get_count(&status, MPI_DOUBLE, &count);
 ```
-Se non ti servono queste info, puoi passare `MPI_STATUS_IGNORE`.
+
+If this information is not needed, `MPI_STATUS_IGNORE` can be used instead.
 
 ---
 
-## Esercizi
+## Exercises
 
-### Esercizio 1 — Hello con Send/Recv (`ex1_hello.cpp`)
-Il processo 0 invia un saluto a tutti gli altri. Introduce la struttura base `if (rank == 0) ... else ...`.
+### Exercise 1 — Hello with Send/Recv (`ex1_hello.cpp`)
 
-### Esercizio 2 — Ping-Pong (`ex2_pingpong.cpp`)
-Processi 0 e 1 si scambiano un valore alternandosi. Misura il tempo con `MPI_Wtime()`.
+Process 0 sends a greeting message to every other process. This exercise introduces the basic
 
-### Esercizio 3 — Deadlock e come evitarlo (`ex3_deadlock.cpp`)
-Mostra il deadlock classico e la sua correzione con l'ordinamento Send/Recv.
+```cpp
+if (rank == 0) { ... }
+else { ... }
+```
 
-### Esercizio 4 — Ring Communication (`ex4_ring.cpp`)
-Ogni processo invia un token al successivo in un anello: `rank → (rank+1) % size`.
+structure commonly used in MPI programs.
+
+### Exercise 2 — Ping-Pong (`ex2_pingpong.cpp`)
+
+Processes 0 and 1 repeatedly exchange a value. Measure the communication time using `MPI_Wtime()`.
+
+### Exercise 3 — Deadlock and How to Avoid It (`ex3_deadlock.cpp`)
+
+Demonstrates a classic deadlock scenario and shows how proper ordering of `MPI_Send` and `MPI_Recv` prevents it.
+
+### Exercise 4 — Ring Communication (`ex4_ring.cpp`)
+
+Each process sends a token to its neighbor in a ring:
+
+```text
+rank → (rank + 1) % size
+```
+
+### Exercise 5 — Barrier Synchronization (`ex5_barrier.cpp`)
+
+Each process performs a task with a different execution time and then calls `MPI_Barrier()`. Observe how faster processes wait for slower ones before continuing.
 
 ---
 
-## Output Atteso
+## Expected Output
 
 ### ex1_hello
-```
-[Processo 0] Ho inviato il saluto a 3 processi.
-[Processo 1] Messaggio ricevuto da 0: "Ciao dal processo 0!"
-[Processo 2] Messaggio ricevuto da 0: "Ciao dal processo 0!"
-[Processo 3] Messaggio ricevuto da 0: "Ciao dal processo 0!"
+
+```text
+[Process 0] Greeting sent to 3 processes.
+[Process 1] Message received from 0: "Hello from process 0!"
+[Process 2] Message received from 0: "Hello from process 0!"
+[Process 3] Message received from 0: "Hello from process 0!"
 ```
 
-### ex2_pingpong (con 2 processi)
-```
-[Ping-Pong] Iterazione 0: valore = 1 (inviato da 0 a 1)
-[Ping-Pong] Iterazione 1: valore = 2 (inviato da 1 a 0)
+### ex2_pingpong (2 processes)
+
+```text
+[Ping-Pong] Iteration 0: value = 1 (sent from 0 to 1)
+[Ping-Pong] Iteration 1: value = 2 (sent from 1 to 0)
 ...
-Tempo totale per 100 ping-pong: 0.00312 secondi
-Latenza stimata (RTT/2): 15.6 microsecondi
+Total time for 100 ping-pongs: 0.00312 seconds
+Estimated latency (RTT/2): 15.6 microseconds
 ```
 
 ### ex4_ring
+
+```text
+Process 0 sends token=0 to process 1
+Process 1 receives 0, increments it to 1, sends it to process 2
+Process 2 receives 1, increments it to 2, sends it to process 3
+Process 3 receives 2, increments it to 3, sends it to process 0
+Process 0 receives final token = 3 ✓
 ```
-Processo 0 invia token=0 al processo 1
-Processo 1 riceve 0, incrementa a 1, invia al processo 2
-Processo 2 riceve 1, incrementa a 2, invia al processo 3
-Processo 3 riceve 2, incrementa a 3, invia al processo 0
-Processo 0 riceve token finale = 3 ✓
+
+### ex5_barrier
+
+```text
+Process 0 reached the barrier
+Process 1 reached the barrier
+Process 2 reached the barrier
+Process 3 reached the barrier
+
+All processes synchronized successfully.
 ```
