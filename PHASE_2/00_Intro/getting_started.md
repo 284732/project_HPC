@@ -182,6 +182,91 @@ MPI_Comm_size(MPI_COMM_WORLD, &size);
 Assigns to `size` the **total number of processes** in the communicator. This
 corresponds to the value passed to `mpirun -np`.
 
+## 4b. Syntax Differences: Fortran `call` vs C++ Direct Calls
+
+If you are coming from Fortran MPI, three syntactic differences will appear immediately
+in every C++ MPI program.
+
+### No `call` keyword
+
+In Fortran, subroutines are invoked with the `call` keyword:
+
+```fortran
+call MPI_Init(ierr)
+call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+```
+
+In C++, MPI functions are standard C functions and are called directly by name:
+
+```cpp
+MPI_Init(&argc, &argv);
+MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+```
+
+There is no `call`. Every MPI routine is simply a function call.
+
+### Error code: last argument vs return value
+
+In Fortran, every MPI routine takes `ierr` as its **last argument**:
+
+```fortran
+call MPI_Send(buf, count, MPI_DOUBLE_PRECISION, dest, tag, MPI_COMM_WORLD, ierr)
+```
+
+In C++, the error code is the **return value** of the function:
+
+```cpp
+int err = MPI_Send(buf, count, MPI_DOUBLE, dest, tag, MPI_COMM_WORLD);
+```
+
+In practice the return value is often ignored in tutorial code, but it can be
+checked for error handling in production programs.
+
+### Pointers for output arguments
+
+This is the most important difference. In Fortran, all arguments are passed
+**by reference by default** — the compiler handles memory addresses automatically:
+
+```fortran
+integer :: rank
+call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+! Fortran automatically passes the address of 'rank' to MPI
+```
+
+In C++, when MPI needs to **write a value into a variable** (output argument),
+you must explicitly pass its address using the `&` operator:
+
+```cpp
+int rank;
+MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+//                             ^
+//                             Required: passes the memory address of 'rank'
+//                             Without &, MPI cannot modify the variable
+```
+
+For **data buffers** (arrays), no `&` is needed because an array name already
+decays to a pointer to its first element:
+
+```cpp
+double buf[100];
+MPI_Send(buf, 100, MPI_DOUBLE, dest, tag, MPI_COMM_WORLD);
+//        ^ no & needed: 'buf' is already a pointer
+
+// With std::vector, use .data() to get the pointer to the internal buffer:
+std::vector<double> v(100);
+MPI_Send(v.data(), 100, MPI_DOUBLE, dest, tag, MPI_COMM_WORLD);
+```
+
+**Quick reference:**
+
+| Argument type          | Fortran   | C++                   |
+|------------------------|-----------|-----------------------|
+| Scalar output (rank, size, etc.) | `rank` | `&rank`    |
+| Data array             | `buf`     | `buf` or `v.data()`   |
+| Communicator (input)   | `MPI_COMM_WORLD` | `MPI_COMM_WORLD` |
+| Request (output)       | `request` | `&request`            |
+| Status (output)        | `status`  | `&status` or `MPI_STATUS_IGNORE` |
+
 ---
 
 ## 5. Minimal Structure of Every MPI Program

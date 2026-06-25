@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
             std::cout << "\n";
         }
 
-        std::cout << "(Ghost rows contain -1 if the neighbor does not exist)\n";
+        std::cout << "(Ghost rows remain 0.0 if the neighbor does not exist)\n";
     }
 
     MPI_Comm_free(&comm_cart);

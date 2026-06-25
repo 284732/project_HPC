@@ -70,12 +70,6 @@ int main(int argc, char* argv[]) {
 
     int north_neighbor, south_neighbor;
 
-    MPI_Cart_shift(comm_cart, 0, -1,
-                   &south_neighbor, &north_neighbor);  // dim 0, disp=-1: move up
-
-    MPI_Cart_shift(comm_cart, 0, +1,
-                   &north_neighbor, &south_neighbor);  // dim 0, disp=+1: move down
-
     // Note: Cart_shift(comm, dir, disp, &src, &dst)
     //
     //   src = who would send data to me if I performed a Recv
