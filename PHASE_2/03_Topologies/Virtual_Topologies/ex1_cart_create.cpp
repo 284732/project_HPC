@@ -1,19 +1,20 @@
 // =============================================================
-// ESERCIZIO 1 — MPI_Cart_create: griglia 2D e stampa vicini
+// EXERCISE 1 — MPI_Cart_create: 2D Grid and Neighbor Discovery
 // =============================================================
-// Crea una topologia virtuale cartesiana 2D.
-// Ogni processo stampa le proprie coordinate e i rank dei vicini
-// (Nord, Sud, Est, Ovest). Bordi non periodici → MPI_PROC_NULL.
+// Creates a virtual 2D Cartesian topology.
+// Each process prints its coordinates and the ranks of its
+// neighbors (North, South, East, West).
+// Non-periodic boundaries → MPI_PROC_NULL.
 //
-// Compilazione:  mpicxx -O2 -Wall -o ex1_cart ex1_cart_create.cpp
-// Esecuzione:    mpirun -np 6 ./ex1_cart
+// Compilation:  mpicxx -O2 -Wall -o ex1_cart ex1_cart_create.cpp
+// Execution:    mpirun -np 6 ./ex1_cart
 // =============================================================
 
 #include <mpi.h>
 #include <iostream>
 #include <string>
 
-// Funzione di utilità: converte un rank in stringa leggibile
+// Utility function: converts a rank into a readable string
 std::string rank_str(int r) {
     if (r == MPI_PROC_NULL) return "NULL";
     return std::to_string(r);
@@ -27,73 +28,95 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PASSO 1: Definisci le dimensioni della griglia
+    // STEP 1: Define the grid dimensions
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // Con 6 processi proviamo una griglia 2x3
+    // With 6 processes, let's try a 2x3 grid
     int ndims = 2;
-    int dims[2]    = {2, 3};   // righe=2, colonne=3
-    int periods[2] = {0, 0};   // non periodico (bordi "fisici")
-    int reorder    = 1;        // MPI può ottimizzare il mapping
+    int dims[2]    = {2, 3};   // rows=2, columns=3
+    int periods[2] = {0, 0};   // non-periodic ("physical" boundaries)
+    int reorder    = 1;        // MPI may optimize the mapping
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PASSO 2: Crea il communicator cartesiano
+    // STEP 2: Create the Cartesian communicator
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     MPI_Comm comm_cart;
     MPI_Cart_create(MPI_COMM_WORLD, ndims, dims, periods, reorder, &comm_cart);
 
-    // Rank nel nuovo communicator (potrebbe differire da MPI_COMM_WORLD se reorder=1)
+    // Rank in the new communicator
+    // (may differ from MPI_COMM_WORLD if reorder=1)
     int rank_cart;
     MPI_Comm_rank(comm_cart, &rank_cart);
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PASSO 3: Ottieni le coordinate del processo corrente
+    // STEP 3: Get the coordinates of the current process
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     int coords[2];
     MPI_Cart_coords(comm_cart, rank_cart, ndims, coords);
-    // coords[0] = riga, coords[1] = colonna
+
+    // coords[0] = row, coords[1] = column
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PASSO 4: Trova i vicini con MPI_Cart_shift
+    // STEP 4: Find neighbors with MPI_Cart_shift
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // MPI_Cart_shift(comm, direction, disp, &rank_src, &rank_dst)
-    // - direction=0 → dimensione 0 (righe = verticale = Nord/Sud)
-    // - direction=1 → dimensione 1 (colonne = orizzontale = Est/Ovest)
-    // - disp=+1     → avanza nella dimensione (Sud / Est)
-    // - disp=-1     → arretra nella dimensione (Nord / Ovest)
-    // Se il vicino non esiste (bordo non periodico), rank = MPI_PROC_NULL
+    //
+    // - direction=0 → dimension 0 (rows = vertical = North/South)
+    // - direction=1 → dimension 1 (columns = horizontal = East/West)
+    // - disp=+1     → move forward in the dimension (South / East)
+    // - disp=-1     → move backward in the dimension (North / West)
+    //
+    // If the neighbor does not exist
+    // (non-periodic boundary), rank = MPI_PROC_NULL
 
-    int vicino_nord, vicino_sud;
-    MPI_Cart_shift(comm_cart, 0, -1, &vicino_sud, &vicino_nord);  // dim 0, disp=-1: vai su
-    MPI_Cart_shift(comm_cart, 0, +1, &vicino_nord, &vicino_sud);  // dim 0, disp=+1: vai giù
+    int north_neighbor, south_neighbor;
 
-    // Nota: Cart_shift(comm, dir, disp, &src, &dst)
-    //   src = chi mi manderebbe dati se io facessi Recv (= il vicino "da cui vengo")
-    //   dst = a chi invio se faccio Send (= il vicino "verso cui vado")
-    // Per trovare Nord (chi è sopra): mi "sposto" di -1 nella dir 0
-    //   → source = il vicino a cui mi avvicino spostandomi, dest = da cui vengo
-    // È un po' controintuitivo: facciamo la versione esplicita:
+    MPI_Cart_shift(comm_cart, 0, -1,
+                   &south_neighbor, &north_neighbor);  // dim 0, disp=-1: move up
 
-    int nord, sud, est, ovest;
-    int dummy;  // il "source" di Cart_shift che qui non ci serve
+    MPI_Cart_shift(comm_cart, 0, +1,
+                   &north_neighbor, &south_neighbor);  // dim 0, disp=+1: move down
 
-    // Vicino NORD (riga - 1): shift di -1 nella direzione 0
-    MPI_Cart_shift(comm_cart, 0, -1, &dummy, &nord);
-    // Vicino SUD  (riga + 1): shift di +1 nella direzione 0
-    MPI_Cart_shift(comm_cart, 0, +1, &dummy, &sud);
-    // Vicino OVEST (col - 1): shift di -1 nella direzione 1
-    MPI_Cart_shift(comm_cart, 1, -1, &dummy, &ovest);
-    // Vicino EST  (col + 1): shift di +1 nella direzione 1
-    MPI_Cart_shift(comm_cart, 1, +1, &dummy, &est);
+    // Note: Cart_shift(comm, dir, disp, &src, &dst)
+    //
+    //   src = who would send data to me if I performed a Recv
+    //         (= the neighbor I come from)
+    //
+    //   dst = who receives data from me if I perform a Send
+    //         (= the neighbor I move toward)
+    //
+    // To find North (the process above me):
+    // I "move" by -1 along direction 0.
+    //
+    //   → source = the neighbor I approach by moving
+    //   → dest   = the neighbor I move away from
+    //
+    // This is somewhat counterintuitive,
+    // so let's use the explicit version:
 
-    // Sincronizza l'output per renderlo leggibile
+    int north, south, east, west;
+    int dummy;  // the "source" returned by Cart_shift, unused here
+
+    // NORTH neighbor (row - 1): shift -1 in direction 0
+    MPI_Cart_shift(comm_cart, 0, -1, &dummy, &north);
+
+    // SOUTH neighbor (row + 1): shift +1 in direction 0
+    MPI_Cart_shift(comm_cart, 0, +1, &dummy, &south);
+
+    // WEST neighbor (col - 1): shift -1 in direction 1
+    MPI_Cart_shift(comm_cart, 1, -1, &dummy, &west);
+
+    // EAST neighbor (col + 1): shift +1 in direction 1
+    MPI_Cart_shift(comm_cart, 1, +1, &dummy, &east);
+
+    // Synchronize output to improve readability
     MPI_Barrier(comm_cart);
 
     std::cout << "P" << rank_cart
               << " coords(" << coords[0] << "," << coords[1] << ")"
-              << " | N=" << rank_str(nord)
-              << " S=" << rank_str(sud)
-              << " O=" << rank_str(ovest)
-              << " E=" << rank_str(est)
+              << " | N=" << rank_str(north)
+              << " S=" << rank_str(south)
+              << " W=" << rank_str(west)
+              << " E=" << rank_str(east)
               << std::endl;
 
     MPI_Comm_free(&comm_cart);
