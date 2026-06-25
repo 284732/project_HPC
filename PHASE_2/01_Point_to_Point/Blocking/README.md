@@ -114,11 +114,6 @@ Each process sends a token to its neighbor in a ring:
 ```text
 rank → (rank + 1) % size
 ```
-
-### Exercise 5 — Barrier Synchronization (`ex5_barrier.cpp`)
-
-Each process performs a task with a different execution time and then calls `MPI_Barrier()`. Observe how faster processes wait for slower ones before continuing.
-
 ---
 
 ## Expected Output
@@ -150,15 +145,4 @@ Process 1 receives 0, increments it to 1, sends it to process 2
 Process 2 receives 1, increments it to 2, sends it to process 3
 Process 3 receives 2, increments it to 3, sends it to process 0
 Process 0 receives final token = 3 ✓
-```
-
-### ex5_barrier
-
-```text
-Process 0 reached the barrier
-Process 1 reached the barrier
-Process 2 reached the barrier
-Process 3 reached the barrier
-
-All processes synchronized successfully.
 ```
