@@ -1,21 +1,21 @@
 // =============================================================
-// ESERCIZIO 2 — Halo Exchange su griglia 2D
+// EXERCISE 2 — 2D Halo Exchange
 // =============================================================
-// Ogni processo gestisce un sotto-dominio locale (con celle ghost).
-// Lo "halo exchange" aggiorna le celle ghost dai vicini.
-// Usato in ogni iterazione di Jacobi, Gauss-Seidel, FD, ecc.
+// Each process manages a local subdomain (with ghost cells).
+// The "halo exchange" updates ghost cells using data from neighbors.
+// Used in every iteration of Jacobi, Gauss-Seidel, finite differences, etc.
 //
-// Schema memoria locale (4x4 con ghost):
+// Local memory layout (4x4 with ghost cells):
 //
-//   g g g g g g     ← riga ghost Nord
+//   g g g g g g     ← North ghost row
 //   g * * * * g
-//   g * * * * g     * = celle reali
-//   g * * * * g     g = celle ghost (aggiornate dai vicini)
+//   g * * * * g     * = real cells
+//   g * * * * g     g = ghost cells (updated by neighbors)
 //   g * * * * g
-//   g g g g g g     ← riga ghost Sud
+//   g g g g g g     ← South ghost row
 //
-// Compilazione:  mpicxx -O2 -Wall -o ex2_halo ex2_halo_exchange.cpp
-// Esecuzione:    mpirun -np 4 ./ex2_halo
+// Compilation:  mpicxx -O2 -Wall -o ex2_halo ex2_halo_exchange.cpp
+// Execution:    mpirun -np 4 ./ex2_halo
 // =============================================================
 
 #include <mpi.h>
@@ -30,9 +30,9 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    // Griglia di processi: assumiamo decomposizione 1D per semplicità
-    // (solo scambio Nord-Sud, ogni processo ha una striscia di righe)
-    int dims[2]    = {size, 1};  // size righe, 1 colonna
+    // Process grid: assume a 1D decomposition for simplicity
+    // (only North-South exchange, each process owns a strip of rows)
+    int dims[2]    = {size, 1};  // size rows, 1 column
     int periods[2] = {0, 0};
     int reorder    = 0;
 
@@ -43,71 +43,74 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(comm_cart, &rank_cart);
     MPI_Cart_coords(comm_cart, rank_cart, 2, coords);
 
-    // Vicini Nord e Sud
-    int vicino_nord, vicino_sud, dummy;
-    MPI_Cart_shift(comm_cart, 0, -1, &dummy, &vicino_nord);
-    MPI_Cart_shift(comm_cart, 0, +1, &dummy, &vicino_sud);
+    // North and South neighbors
+    int north_neighbor, south_neighbor, dummy;
+    MPI_Cart_shift(comm_cart, 0, -1, &dummy, &north_neighbor);
+    MPI_Cart_shift(comm_cart, 0, +1, &dummy, &south_neighbor);
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PASSO 1: Inizializza il dominio locale (con righe ghost)
+    // STEP 1: Initialize the local domain (with ghost rows)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const int N_ROWS_LOCALE = 4;  // righe reali per processo
-    const int N_COLS        = 6;  // colonne (uguale per tutti)
-    // Con ghost: (N_ROWS_LOCALE + 2) righe totali
-    int n_rows_totale = N_ROWS_LOCALE + 2;
+    const int N_LOCAL_ROWS = 4;  // real rows per process
+    const int N_COLS       = 6;  // columns (same for all processes)
 
-    // Layout: u[i][j], i=0 ghost nord, i=n_rows_totale-1 ghost sud
-    std::vector<std::vector<double>> u(n_rows_totale, std::vector<double>(N_COLS, 0.0));
+    // With ghosts: (N_LOCAL_ROWS + 2) total rows
+    int total_rows = N_LOCAL_ROWS + 2;
 
-    // Inizializza le celle reali con il rank del processo
-    for (int i = 1; i <= N_ROWS_LOCALE; i++)
+    // Layout: u[i][j], i=0 north ghost, i=total_rows-1 south ghost
+    std::vector<std::vector<double>> u(total_rows, std::vector<double>(N_COLS, 0.0));
+
+    // Initialize real cells with the process rank
+    for (int i = 1; i <= N_LOCAL_ROWS; i++)
         for (int j = 0; j < N_COLS; j++)
             u[i][j] = static_cast<double>(rank_cart);
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PASSO 2: Halo Exchange (scambio righe di bordo)
+    // STEP 2: Halo Exchange (exchange boundary rows)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // Inviamo la nostra prima riga reale al vicino NORD
-    // Riceviamo dal vicino NORD nella nostra ghost row nord (riga 0)
-    // E viceversa per SUD.
+    // Send our first real row to the NORTH neighbor.
+    // Receive from the NORTH neighbor into our north ghost row (row 0).
+    // Similarly for the SOUTH neighbor.
 
-    const int TAG_NS = 1;  // tag per scambio Nord-Sud
-    const int TAG_SN = 2;  // tag per scambio Sud-Nord
+    const int TAG_NS = 1;  // tag for North-to-South exchange
+    const int TAG_SN = 2;  // tag for South-to-North exchange
 
-    // Scambio con il vicino NORD
-    // Mando u[1] a nord, ricevo da nord in u[0]
+    // Exchange with the NORTH neighbor
+    // Send u[1] north, receive from north into u[0]
     MPI_Sendrecv(
-        u[1].data(), N_COLS, MPI_DOUBLE, vicino_nord, TAG_NS,
-        u[0].data(), N_COLS, MPI_DOUBLE, vicino_nord, TAG_SN,
+        u[1].data(), N_COLS, MPI_DOUBLE, north_neighbor, TAG_NS,
+        u[0].data(), N_COLS, MPI_DOUBLE, north_neighbor, TAG_SN,
         comm_cart, MPI_STATUS_IGNORE
     );
 
-    // Scambio con il vicino SUD
-    // Mando u[N_ROWS_LOCALE] a sud, ricevo da sud in u[N_ROWS_LOCALE+1]
+    // Exchange with the SOUTH neighbor
+    // Send u[N_LOCAL_ROWS] south, receive from south into u[N_LOCAL_ROWS+1]
     MPI_Sendrecv(
-        u[N_ROWS_LOCALE].data(),   N_COLS, MPI_DOUBLE, vicino_sud, TAG_SN,
-        u[N_ROWS_LOCALE+1].data(), N_COLS, MPI_DOUBLE, vicino_sud, TAG_NS,
+        u[N_LOCAL_ROWS].data(),   N_COLS, MPI_DOUBLE, south_neighbor, TAG_SN,
+        u[N_LOCAL_ROWS+1].data(), N_COLS, MPI_DOUBLE, south_neighbor, TAG_NS,
         comm_cart, MPI_STATUS_IGNORE
     );
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // PASSO 3: Verifica e stampa
+    // STEP 3: Verification and output
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     MPI_Barrier(comm_cart);
 
     if (rank_cart == 0) {
-        std::cout << "\nDopo l'halo exchange, sottodominio del processo " << rank_cart
-                  << " (vicino_nord=" << (vicino_nord == MPI_PROC_NULL ? -1 : vicino_nord)
-                  << ", vicino_sud=" << (vicino_sud == MPI_PROC_NULL ? -1 : vicino_sud) << "):\n";
+        std::cout << "\nAfter halo exchange, subdomain of process " << rank_cart
+                  << " (north_neighbor=" << (north_neighbor == MPI_PROC_NULL ? -1 : north_neighbor)
+                  << ", south_neighbor=" << (south_neighbor == MPI_PROC_NULL ? -1 : south_neighbor) << "):\n";
 
-        for (int i = 0; i < n_rows_totale; i++) {
+        for (int i = 0; i < total_rows; i++) {
             std::string label = (i == 0) ? " [ghost N]" :
-                                (i == n_rows_totale-1) ? " [ghost S]" : " [reale  ]";
-            std::cout << label << " riga " << i << ": ";
+                                (i == total_rows - 1) ? " [ghost S]" : " [real    ]";
+
+            std::cout << label << " row " << i << ": ";
             for (double v : u[i]) std::cout << std::setw(4) << v;
             std::cout << "\n";
         }
-        std::cout << "(Le ghost rows valgono -1 se il vicino non esiste)\n";
+
+        std::cout << "(Ghost rows contain -1 if the neighbor does not exist)\n";
     }
 
     MPI_Comm_free(&comm_cart);
