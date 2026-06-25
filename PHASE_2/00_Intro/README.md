@@ -228,13 +228,3 @@ The final modules combine communication primitives and numerical algorithms to d
 
 ---
 
-## Learning Objectives
-
-After completing this section, the reader should be able to:
-
-* Understand the role of C++ in High Performance Computing
-* Recognize the importance of memory locality and data layout
-* Use numerical libraries commonly adopted in scientific applications
-* Understand the differences between Fortran and C++ in HPC environments
-* Interpret the MPI programming model
-* Prepare for the distributed-memory examples presented in the subsequent modules
