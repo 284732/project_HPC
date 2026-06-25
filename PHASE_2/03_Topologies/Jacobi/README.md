@@ -1,19 +1,22 @@
-# 04b — Solver di Jacobi 2D con MPI
+# 04b — 2D Jacobi Solver with MPI
 
-## Il problema fisico
+## The Physical Problem
 
-Risolviamo l'**equazione di Poisson** su un dominio quadrato [0,1]×[0,1]:
+We solve the **Poisson equation** on a square domain [0,1]×[0,1]:
 
 ```
--∇²u = f(x,y)    nel dominio
- u   = g(x,y)    sui bordi (condizioni di Dirichlet)
+-∇²u = f(x,y)    inside the domain
+ u   = g(x,y)    on the boundary (Dirichlet conditions)
 ```
 
-Con `f=0` diventa l'**equazione di Laplace**: la soluzione è la distribuzione di temperatura in equilibrio data la temperatura fissata sui bordi.
+Setting `f=0` reduces it to the **Laplace equation**: the solution represents the
+steady-state temperature distribution given fixed temperatures on the boundaries.
 
-## Il metodo di Jacobi
+---
 
-Schema alle differenze finite con stencil a 5 punti:
+## The Jacobi Method
+
+Finite difference scheme with a 5-point stencil:
 
 ```
          u[i-1][j]
@@ -22,64 +25,71 @@ u[i][j-1] - u[i][j] - u[i][j+1]
              |
          u[i+1][j]
 
-Aggiornamento: u_new[i][j] = 0.25 * (u[i-1][j] + u[i+1][j] + u[i][j-1] + u[i][j+1])
-                                      (per f=0)
+Update: u_new[i][j] = 0.25 * (u[i-1][j] + u[i+1][j] + u[i][j-1] + u[i][j+1])
+                               (for f=0)
 ```
 
-Il metodo itera finché la variazione massima scende sotto una soglia ε.
+The method iterates until the maximum change between successive solutions drops
+below a threshold ε.
 
-## Parallelizzazione con MPI
+---
 
-### Decomposizione del dominio
+## Parallelization with MPI
 
-La griglia globale (N×N) viene divisa in strisce orizzontali:
+### Domain Decomposition
+
+The global grid (N×N) is divided into horizontal strips:
 
 ```
-Processo 0: righe  0 ..  N/P-1  + ghost row sotto
-Processo 1: righe  N/P .. 2N/P-1  + ghost row sopra e sotto
+Process 0:   rows  0     ..  N/P-1    + ghost row below
+Process 1:   rows  N/P   ..  2N/P-1  + ghost row above and below
 ...
-Processo P-1: ultime N/P righe   + ghost row sopra
+Process P-1: last  N/P rows           + ghost row above
 ```
 
-### Algoritmo per iterazione
+### Per-Iteration Algorithm
 
 ```
-1. Halo exchange: scambia righe di bordo con i vicini
-2. Aggiorna tutte le celle interne: u_new[i][j] = media(vicini)
-3. Calcola variazione locale: max|u_new - u_old|
-4. MPI_Allreduce(MPI_MAX) → variazione globale
-5. Se variazione < ε → converge → esci
+1. Halo exchange:     swap boundary rows with neighbouring processes
+2. Update all cells:  u_new[i][j] = average(neighbours)
+3. Compute local change: max|u_new - u_old|
+4. MPI_Allreduce(MPI_MAX) → global maximum change
+5. If change < ε → converged → exit
 ```
 
-### Schema temporale
+### Iteration Timeline
 
 ```
-Iterazione k:
-  ├── MPI_Sendrecv (halo exchange Nord-Sud)
-  ├── Aggiorna stencil locale
-  ├── MPI_Allreduce (max variazione)
-  └── Controllo convergenza
+Iteration k:
+  ├── MPI_Sendrecv  (North-South halo exchange)
+  ├── Update local stencil
+  ├── MPI_Allreduce (maximum change)
+  └── Convergence check
 ```
 
 ---
 
-## Esercizi
+## Exercises
 
-### Esercizio 1 — Jacobi 1D (strisce) (`jacobi_1d_strips.cpp`)
-Versione semplificata: decomposizione in strisce orizzontali, solo scambio Nord-Sud.
+### Exercise 1 — 1D Jacobi (strips) — `jacobi_1d_strips.cpp`
 
-### Esercizio 2 — Jacobi 2D completo (`jacobi_2d_full.cpp`)
-Decomposizione 2D con topologia cartesiana, halo exchange sui 4 lati, condizioni al bordo non banali.
+Simplified version: decomposition into horizontal strips, North-South exchange only.
+
+### Exercise 2 — Full 2D Jacobi — `jacobi_2d_full.cpp`
+
+Full 2D decomposition using a Cartesian topology, halo exchange on all four sides,
+and non-trivial boundary conditions.
 
 ---
 
-## Output Atteso
+## Expected Output
 
-### jacobi_1d_strips (4 processi, griglia 64×64)
+### jacobi_1d_strips (4 processes, 64×64 grid)
+
 ```
-[Iter    0] variazione max = 1.00000e+00
-[Iter  100] variazione max = 1.23456e-02
-[Iter  500] variazione max = 2.45e-04
-[Iter 1847] CONVERGENZA raggiunta! variazione = 9.87e-07 < eps = 1e-06
-Tempo totale: 0.342 secondi
+[Iter    0] max change = 1.00000e+00
+[Iter  100] max change = 1.23456e-02
+[Iter  500] max change = 2.45e-04
+[Iter 1847] CONVERGED! change = 9.87e-07 < eps = 1e-06
+Total time: 0.342 seconds
 ```
