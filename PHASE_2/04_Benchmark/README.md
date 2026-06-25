@@ -1,279 +1,298 @@
-# C++ vs Fortran per HPC: Benchmark e Analisi Comparativa
+# C++ vs Fortran for HPC: Benchmark and Comparative Analysis
 
-> Questo documento risponde alla domanda concreta: **vale la pena riscrivere codice Fortran in C++, e cosa ci guadagno/perdo in termini di performance?**
-
----
-
-## 1. Il contesto: perché il confronto è complicato
-
-C++ e Fortran sono entrambi linguaggi **compilati, staticamente tipizzati, con accesso diretto alla memoria**.
-A parità di algoritmo e compilatore, la differenza di performance pura è spesso **inferiore al 5–10%** — e
-dipende molto più dal **tipo di problema** che dal linguaggio in sé.
-
-Tuttavia esistono differenze strutturali che in certi scenari diventano significative.
+> This document answers a concrete question: **is it worth rewriting Fortran code in C++,
+> and what is gained or lost in terms of performance?**
 
 ---
 
-## 2. Il vantaggio strutturale di Fortran: il problema dell'aliasing
+## 1. Context: Why the Comparison Is Not Straightforward
 
-Questa è la ragione più citata in letteratura per cui Fortran può essere **più veloce di C/C++ per calcolo numerico**.
+C++ and Fortran are both **compiled, statically typed languages with direct memory access**.
+Given the same algorithm and compiler, the raw performance difference is often **less than
+5–10%** — and depends far more on the **type of problem** than on the language itself.
 
-### Cosa è l'aliasing
+However, structural differences exist that become significant in certain scenarios.
 
-In C/C++, due puntatori diversi possono puntare alla stessa area di memoria (alias).
-Il compilatore **non può sapere** se questo accade, quindi deve essere conservativo:
+---
+
+## 2. Fortran's Structural Advantage: The Aliasing Problem
+
+This is the most frequently cited reason in the literature for why Fortran can be
+**faster than C/C++ for numerical computation**.
+
+### What Is Aliasing
+
+In C/C++, two different pointers can point to the same memory region (alias).
+The compiler **cannot know** whether this happens, so it must be conservative:
 
 ```cpp
-// C++: il compilatore NON può riordinare queste operazioni
-// perché non sa se a e b puntano alla stessa memoria
-void somma(double* a, double* b, double* c, int n) {
+// C++: the compiler CANNOT reorder these operations
+// because it does not know whether a, b, and c point to the same memory
+void add(double* a, double* b, double* c, int n) {
     for (int i = 0; i < n; i++)
-        c[i] = a[i] + b[i];  // e se c == a? Il compilatore deve assumere che sì
+        c[i] = a[i] + b[i];  // what if c == a? The compiler must assume it might be
 }
 ```
 
-In Fortran, il linguaggio **garantisce per standard** che gli argomenti di una subroutine
-non si sovrappongono in memoria (no aliasing). Il compilatore può quindi:
-- Riordinare le istruzioni liberamente
-- Vettorizzare i loop automaticamente con SIMD
-- Tenere valori nei registri più a lungo
+In Fortran, the language **guarantees by standard** that subroutine arguments do not
+overlap in memory (no aliasing). The compiler can therefore:
+- Freely reorder instructions
+- Automatically vectorize loops using SIMD
+- Keep values in registers longer
 
 ```fortran
-! Fortran: il compilatore SA che a, b, c non si sovrappongono
-subroutine somma(a, b, c, n)
+! Fortran: the compiler KNOWS that a, b, c do not overlap
+subroutine add(a, b, c, n)
     real(8), intent(in)  :: a(n), b(n)
     real(8), intent(out) :: c(n)
     integer, intent(in)  :: n
     integer :: i
     do i = 1, n
-        c(i) = a(i) + b(i)  ! il compilatore può vettorizzare liberamente
+        c(i) = a(i) + b(i)  ! the compiler can vectorize freely
     end do
 end subroutine
 ```
 
-### La soluzione in C++: `__restrict__`
+### The C++ Solution: `__restrict__`
 
-C++ offre la keyword `__restrict__` (non standard, ma supportata da GCC, Clang, Intel):
+C++ provides the `__restrict__` keyword (non-standard, but supported by GCC, Clang,
+and Intel compilers):
 
 ```cpp
-void somma(double* __restrict__ a, double* __restrict__ b,
-           double* __restrict__ c, int n) {
+void add(double* __restrict__ a, double* __restrict__ b,
+         double* __restrict__ c, int n) {
     for (int i = 0; i < n; i++)
-        c[i] = a[i] + b[i];  // ora il compilatore può vettorizzare
+        c[i] = a[i] + b[i];  // the compiler can now vectorize
 }
 ```
 
-Con `__restrict__` la performance di C++ raggiunge quella di Fortran per questi loop.
-Ma in Fortran è il **default**, in C++ è opt-in (e richiede disciplina).
+With `__restrict__`, C++ performance matches Fortran for these loops.
+In Fortran this is the **default behavior**; in C++ it is opt-in and requires discipline.
 
-**Fonte:** <https://beza1e1.tuxen.de/articles/faster_than_C.html> — "Fortran semantics say that function arguments never alias [...] This is why Fortran is often faster than C. This is why numerical libraries are still written in Fortran."
+**Source:** <https://beza1e1.tuxen.de/articles/faster_than_C.html> —
+*"Fortran semantics say that function arguments never alias [...] This is why Fortran
+is often faster than C. This is why numerical libraries are still written in Fortran."*
 
 ---
 
-## 3. Benchmark reali dalla letteratura (2019–2024)
+## 3. Real Benchmarks from the Literature (2019–2024)
 
-### 3.1 — Array-heavy computation (fisica nucleare)
+### 3.1 — Array-Heavy Computation (Nuclear Physics)
 
-Un paper del 2024 (arXiv:2409.06837) confronta CMF (Fortran legacy) con CMF++ (C++
-moderno con Eigen) sullo stesso algoritmo di equazioni di stato in 1D, 2D, 3D:
+A 2024 paper (arXiv:2409.06837) compares CMF (legacy Fortran) with CMF++ (modern C++
+with Eigen) on the same equation-of-state algorithm in 1D, 2D, and 3D:
 
-| Dimensione problema | Fortran runtime | C++ runtime | Speedup C++ |
-|--------------------|-----------------|-------------|-------------|
-| 1D (10k sistemi)   | ~10s            | ~0.3s       | **~33×**    |
-| 2D (10M sistemi)   | ~10⁴s (est.)    | ~20s        | **~500×**   |
-| 3D (100M sistemi)  | extrapolato     | ~200s       | **>1000×**  |
+| Problem size        | Fortran runtime | C++ runtime | C++ speedup |
+|---------------------|-----------------|-------------|-------------|
+| 1D (10k systems)    | ~10 s           | ~0.3 s      | **~33×**    |
+| 2D (10M systems)    | ~10⁴ s (est.)   | ~20 s       | **~500×**   |
+| 3D (100M systems)   | extrapolated    | ~200 s      | **>1000×**  |
 
-> ⚠️ Attenzione: in questo caso il vantaggio di C++ non viene dal linguaggio ma dalla **diversa complessità algoritmica** (O(n) vs O(n log n)) e dall'eliminazione di array temporanei grazie a Eigen. È un esempio di C++ moderno vs Fortran **legacy mal scritto**, non un confronto equo tra i linguaggi.
+> ⚠️ Important caveat: the C++ advantage here does not come from the language itself
+> but from a **different algorithmic complexity** (O(n) vs O(n log n)) and from the
+> elimination of temporary arrays via Eigen. This is modern C++ vs **poorly written
+> legacy Fortran** — not a fair language-to-language comparison.
 
-### 3.2 — Loop numerici semplici (Knapsack algorithm)
+### 3.2 — Simple Numerical Loops (Knapsack Algorithm)
 
-Un paper empirico (arXiv:1903.08936) confronta implementazioni identiche dello stesso algoritmo:
+An empirical paper (arXiv:1903.08936) compares identical implementations of the same
+algorithm:
 
-| Algoritmo | Fortran (media) | C++ (media) | Vincitore |
-|-----------|-----------------|-------------|-----------|
-| MTU1      | 59s             | 30s         | C++ ~2×   |
-| MTU2      | ordini di grandezza diversi | — | dipende dal sorting |
+| Algorithm | Fortran (average) | C++ (average) | Winner    |
+|-----------|-------------------|---------------|-----------|
+| MTU1      | 59 s              | 30 s          | C++ ~2×   |
+| MTU2      | orders of magnitude apart | —   | depends on sorting |
 
-### 3.3 — Parallel heat equation (LLM & HPC benchmark, 2024)
+### 3.3 — Parallel Heat Equation (LLM & HPC Benchmark, 2024)
 
-Il paper arXiv:2504.03665 confronta C++ e Fortran su AMD EPYC 7763 e Intel Xeon con scaling MPI:
+The paper arXiv:2504.03665 compares C++ and Fortran on AMD EPYC 7763 and Intel Xeon
+with MPI scaling:
 
 ```
-Scaling da 1 a 64 core (heat equation, 10M nodi):
-  C++:    scala bene con il numero di core
-  Fortran: speedup fino a ~5 core, poi stagnazione
+Scaling from 1 to 64 cores (heat equation, 10M nodes):
+  C++:     scales well with core count
+  Fortran: speedup up to ~5 cores, then stagnation
 
-Scaling matrix mult (10k×10k, Intel Xeon):
-  C++:    comportamento irregolare  
-  Fortran: comportamento irregolare (stesso problema)
-  
+Matrix multiplication scaling (10k×10k, Intel Xeon):
+  C++:     irregular behavior
+  Fortran: irregular behavior (same issue)
+
 DGEMM (Arm A64FX):
-  Fortran: ~0.02 GFLOP/s (codice generato, non ottimizzato)
-  C++:     performance crescenti con dimensione
+  Fortran: ~0.02 GFLOP/s (LLM-generated, unoptimized code)
+  C++:     performance increases with problem size
 ```
 
-> Nota: questi benchmark usano codice **generato da LLM** non ottimizzato a mano —
-> i risultati riflettono quanto sia facile/difficile scrivere codice performante nei due linguaggi.
+> Note: these benchmarks use **LLM-generated code**, not hand-optimized implementations.
+> The results reflect how easy or difficult it is to produce performant code in each
+> language without expert tuning.
 
-### 3.4 — Librerie QCD (fisica delle particelle)
+### 3.4 — QCD Libraries (Particle Physics)
 
-Il progetto Grid (arXiv:1512.03487) mostra che C++ con SIMD intrinsics espliciti
-raggiunge **65% del picco teorico** su Intel Core i7, **superando Fortran** per calcoli
-su reticoli di matrici SU(3):
+The Grid project (arXiv:1512.03487) shows that C++ with explicit SIMD intrinsics
+achieves **65% of theoretical peak** on Intel Core i7, **outperforming Fortran** for
+SU(3) matrix lattice computations:
 
 ```
-Peak performance su L2 cache (single core, Intel i7-3615QM):
-  C++ (Grid con SIMD intrinsics): ~24 GFLOP/s  (~65% del picco)
-  Fortran equivalente:            ~18-20 GFLOP/s
+Peak performance on L2 cache (single core, Intel i7-3615QM):
+  C++ (Grid with SIMD intrinsics): ~24 GFLOP/s  (~65% of peak)
+  Equivalent Fortran:              ~18–20 GFLOP/s
 ```
 
 ---
 
-## 4. Il vero benchmark: cosa conta davvero in HPC
+## 4. What Actually Determines Performance in HPC
 
-### 4.1 — Fortran vince quando:
-
-```
-Scenario                              Vantaggio Fortran
-─────────────────────────────────     ─────────────────
-Loop densi su array N-dim             +5% → +20% tipico
-Codice scritto 20+ anni fa            Il compilatore conosce bene i pattern
-Nessun uso di puntatori              No aliasing → ottimizzazione aggressiva
-Column-major access (matrici)         Layout nativo, cache-friendly di default
-```
-
-**Citazione letterale** (arXiv:1910.06415, BACKUS paper, 2019):
-> "Fortran is almost best in terms of performances (secondary only to machine code), and in the realm of C and C++ in terms of programmer productivity."
-
-**Citazione letterale** (arXiv:2301.02432, "Myths and Legends in HPC"):
-> "It seems hard to replace Fortran with C or other languages and outperform it or even achieve the same baseline. This may be due to [...] the limited language features (e.g., no pointer aliasing) that enable more powerful optimizations."
-
-### 4.2 — C++ vince quando:
+### 4.1 — When Fortran Wins
 
 ```
-Scenario                              Vantaggio C++
-─────────────────────────────────     ─────────────────
-Strutture dati complesse (grafi)      Fortran non ha equivalenti
-Algoritmi con sorting/hashing         STL (sort, unordered_map) ottimizzati
-Template metaprogramming              Eigen, lazy evaluation, zero-copy
-Interoperabilità con GPU              CUDA, SYCL, HIP nativi
-Codice nuovo da zero                  Compilatori moderni (Clang, NVHPC)
+Scenario                                  Fortran advantage
+────────────────────────────────────      ──────────────────
+Dense loops over N-dimensional arrays     +5% to +20% typical
+Code written 20+ years ago                Compiler knows the patterns well
+No pointer usage                          No aliasing → aggressive optimization
+Column-major array access                 Native layout, cache-friendly by default
 ```
 
-**Dati concreti:** Il paper TBPLaS 2.0 (arXiv:2509.26309) mostra che C++ con
-eliminazione di array temporanei (lazy evaluation via Eigen) può essere
-**"several times or even an order of magnitude faster than Fortran"** per algoritmi
-che Fortran gestisce con array temporanei impliciti nelle funzioni.
+**Direct quote** (arXiv:1910.06415, BACKUS paper, 2019):
+> *"Fortran is almost best in terms of performances (secondary only to machine code),
+> and in the realm of C and C++ in terms of programmer productivity."*
 
-### 4.3 — Dipende dal compilatore, non solo dal linguaggio
+**Direct quote** (arXiv:2301.02432, "Myths and Legends in HPC"):
+> *"It seems hard to replace Fortran with C or other languages and outperform it or
+> even achieve the same baseline. This may be due to [...] the limited language features
+> (e.g., no pointer aliasing) that enable more powerful optimizations."*
 
-Dalle osservazioni del paper arXiv:2504.03665 (benchmark su architetture reali):
+### 4.2 — When C++ Wins
 
 ```
-Architettura    | Linguaggio | Scaling MPI
-────────────────|────────────|─────────────────────────
-AMD EPYC 7763   | C++        | scala fino a 64 core ✓
-AMD EPYC 7763   | Fortran    | scala fino a ~5 core ✗
-Intel Xeon 8358 | C++        | comportamento anomalo ✗
-Intel Xeon 8358 | Fortran    | comportamento anomalo ✗
-Arm A64FX       | C++        | DGEMM crescente ✓
-Arm A64FX       | Fortran    | DGEMM ~0.02 GFLOP/s ✗ (codice LLM)
+Scenario                                  C++ advantage
+────────────────────────────────────      ──────────────────
+Complex data structures (graphs, trees)   No Fortran equivalent
+Sorting and hashing algorithms            Optimized STL (sort, unordered_map)
+Template metaprogramming                  Eigen, lazy evaluation, zero-copy
+GPU and accelerator interoperability      Native CUDA, SYCL, HIP support
+New code written from scratch             Modern compilers (Clang, NVHPC)
 ```
 
-> Il risultato cambia **radicalmente** con l'architettura. Non esiste un vincitore universale.
+**Concrete data:** The TBPLaS 2.0 paper (arXiv:2509.26309) shows that C++ with
+temporary array elimination via lazy evaluation (Eigen) can be
+*"several times or even an order of magnitude faster than Fortran"* for algorithms
+that Fortran handles with implicit temporary arrays inside functions.
+
+### 4.3 — It Depends on the Compiler, Not Just the Language
+
+From the observations in arXiv:2504.03665 (benchmarks on real architectures):
+
+```
+Architecture    | Language | MPI Scaling
+────────────────|──────────|─────────────────────────
+AMD EPYC 7763   | C++      | scales to 64 cores    ✓
+AMD EPYC 7763   | Fortran  | scales to ~5 cores    ✗
+Intel Xeon 8358 | C++      | anomalous behavior    ✗
+Intel Xeon 8358 | Fortran  | anomalous behavior    ✗
+Arm A64FX       | C++      | DGEMM grows with size ✓
+Arm A64FX       | Fortran  | DGEMM ~0.02 GFLOP/s  ✗ (LLM code)
+```
+
+> Results change **drastically** with the target architecture.
+> There is no universal winner.
 
 ---
 
-## 5. Confronto pratico: MPI in C++ vs MPI in Fortran
+## 5. Practical Comparison: MPI in C++ vs MPI in Fortran
 
-Dal punto di vista MPI puro, le due API sono **equivalenti in performance** — MPI è
-una libreria C, i binding Fortran e C++ sono wrapper con overhead trascurabile.
+From a pure MPI standpoint, the two APIs are **equivalent in performance** — MPI is
+a C library, and both the Fortran and C++ bindings are wrappers with negligible overhead.
 
 ```
-Operazione MPI         | Overhead C++ vs Fortran
+MPI Operation          | C++ vs Fortran overhead
 ───────────────────────|─────────────────────────
-MPI_Send/Recv          | identico (stessa libreria)
-MPI_Bcast              | identico
-MPI_Allreduce          | identico
-MPI_Cart_create        | identico
-Halo exchange          | identico
+MPI_Send / MPI_Recv    | identical (same underlying library)
+MPI_Bcast              | identical
+MPI_Allreduce          | identical
+MPI_Cart_create        | identical
+Halo exchange          | identical
 ```
 
-La differenza di performance in codice MPI viene dall'algoritmo circostante,
-non dalle chiamate MPI. Per esempio, il layout della memoria del sotto-dominio
-(row-major C++ vs column-major Fortran) può influenzare i cache miss nell'halo exchange.
+Performance differences in MPI code come from the **surrounding algorithm**, not from
+the MPI calls themselves. For example, the memory layout of a subdomain (row-major in
+C++ vs column-major in Fortran) can affect cache miss rates during halo exchange.
 
-### Il problema del layout in Jacobi 2D
+### The Memory Layout Problem in 2D Jacobi
 
 ```cpp
-// C++: array row-major. u[i][j] → riga i, colonna j
-// Scorrere per colonne è cache-UNFRIENDLY:
+// C++: row-major arrays. u[i][j] → row i, column j
+// Iterating over columns is cache-UNFRIENDLY:
 for (int j = 0; j < N; j++)
-    for (int i = 0; i < N; i++)   // ← MALE: salta in memoria
+    for (int i = 0; i < N; i++)   // ← BAD: jumps in memory
         u[i*N + j] = ...;
 
-// Scorrere per righe è cache-FRIENDLY:
+// Iterating over rows is cache-FRIENDLY:
 for (int i = 0; i < N; i++)
-    for (int j = 0; j < N; j++)   // ← BENE: accesso sequenziale
+    for (int j = 0; j < N; j++)   // ← GOOD: sequential access
         u[i*N + j] = ...;
 ```
 
 ```fortran
-! Fortran: array column-major. A(i,j) → colonna j, riga i
-! Scorrere per righe è cache-UNFRIENDLY in Fortran:
+! Fortran: column-major arrays. A(i,j) → column j, row i
+! Iterating column-by-column is cache-FRIENDLY in Fortran:
 do j = 1, N
-    do i = 1, N   ! ← BENE in Fortran: accesso colonna per colonna
+    do i = 1, N   ! ← GOOD in Fortran: sequential column access
         u(i,j) = ...
     end do
 end do
 ```
 
-> Se porti codice Fortran in C++ senza invertire i loop, perdi performance di cache.
-> Questo è **il bug più comune** nelle traduzioni Fortran→C++.
+> Porting Fortran code to C++ without inverting the loop order leads to cache
+> performance degradation. This is **the most common bug** in Fortran-to-C++ translations.
 
 ---
 
-## 6. Tabella riassuntiva finale
+## 6. Summary Table
 
-| Criterio | Fortran | C++ |
-|----------|---------|-----|
-| **Performance loop numerici** | ★★★★★ (no aliasing) | ★★★★☆ (con `__restrict__`) |
-| **Performance strutture dati** | ★★☆☆☆ | ★★★★★ (STL, template) |
-| **GPU/acceleratori** | ★★★☆☆ (OpenACC, coarray) | ★★★★★ (CUDA, SYCL nativi) |
-| **Interop con librerie moderne** | ★★☆☆☆ (wrapper C) | ★★★★★ (nativo) |
-| **Leggibilità codice scientifico** | ★★★★★ (array nativi) | ★★★☆☆ (verboso) |
-| **Tooling moderno** (debugger, sanitizer) | ★★★☆☆ | ★★★★★ |
-| **Ecosistema librerie** | ★★☆☆☆ (BLAS/LAPACK) | ★★★★★ (Eigen, Boost, ...) |
-| **Diffusione in codici legacy HPC** | ★★★★★ (80% su ARCHER2) | ★★★☆☆ |
-| **Tendenza futura** | ↔ stabile nel calcolo | ↑ crescente in HPC |
+| Criterion | Fortran | C++ |
+|-----------|---------|-----|
+| **Numerical loop performance** | ★★★★★ (no aliasing) | ★★★★☆ (with `__restrict__`) |
+| **Data structure performance** | ★★☆☆☆ | ★★★★★ (STL, templates) |
+| **GPU / accelerators** | ★★★☆☆ (OpenACC, coarray) | ★★★★★ (native CUDA, SYCL) |
+| **Interop with modern libraries** | ★★☆☆☆ (C wrappers) | ★★★★★ (native) |
+| **Readability of scientific code** | ★★★★★ (native arrays) | ★★★☆☆ (verbose) |
+| **Modern tooling** (debugger, sanitizer) | ★★★☆☆ | ★★★★★ |
+| **Library ecosystem** | ★★☆☆☆ (BLAS/LAPACK) | ★★★★★ (Eigen, Boost, ...) |
+| **Presence in legacy HPC codebases** | ★★★★★ (~80% on ARCHER2) | ★★★☆☆ |
+| **Future trend** | ↔ stable in numerical computing | ↑ growing in HPC |
 
-### In una frase
+### In One Sentence
 
-> **Fortran è imbattibile per loop densi su array regolari scritti da esperti.**
-> **C++ vince su tutto il resto, e con `__restrict__` + compilatore moderno pareggia anche i loop.**
-
----
-
-## 7. Cosa significa per questo tutorial
-
-Il codice che hai scritto in C++ in questo repository è **equivalente in performance**
-al codice Fortran che hai già studiato, con queste avvertenze:
-
-1. **Loop interni del Jacobi**: assicurati che il loop esterno sia sulle righe (`i`) e
-   quello interno sulle colonne (`j`) — esattamente come nel codice di `jacobi_1d_strips.cpp`.
-   
-2. **Halo exchange**: `MPI_Sendrecv` in C++ e Fortran chiamano **la stessa funzione C** sottostante — nessuna differenza.
-
-3. **Se vuoi Fortran-level performance garantita** nei tuoi loop Jacobi, aggiungi
-   `-fno-strict-aliasing` a GCC oppure usa `__restrict__` sui puntatori.
+> **Fortran is unmatched for dense loops over regular arrays written by experts.**
+> **C++ wins in everything else, and with `__restrict__` plus a modern compiler it
+> matches Fortran even on numerical loops.**
 
 ---
 
-## Riferimenti
+## 7. Implications for This Tutorial
+
+The C++ code presented in this repository is **performance-equivalent** to the
+corresponding Fortran implementations, with the following considerations:
+
+1. **Inner loops of the Jacobi solver**: the outer loop must iterate over rows (`i`)
+   and the inner loop over columns (`j`) — exactly as written in `jacobi_1d_strips.cpp`.
+   Inverting this order would degrade cache efficiency.
+
+2. **Halo exchange**: `MPI_Sendrecv` in both C++ and Fortran calls the **same
+   underlying C function** — there is no performance difference between the two.
+
+3. **To guarantee Fortran-level performance** in numerical loops, add
+   `-fno-strict-aliasing` to GCC or apply `__restrict__` to raw pointers in
+   performance-critical kernels.
+
+---
+
+## References
 
 - arXiv:2409.06837 — Phase Stability in Chiral Mean-Field Model (C++ vs Fortran benchmark)
-- arXiv:1903.08936 — Knapsack algorithm, C++ vs Fortran empirical comparison
-- arXiv:2504.03665 — LLM & HPC: Benchmarking on AMD/Intel/ARM (2024)
+- arXiv:1903.08936 — Knapsack algorithm: C++ vs Fortran empirical comparison
+- arXiv:2504.03665 — LLM & HPC: Benchmarking on AMD / Intel / ARM (2024)
 - arXiv:1512.03487 — Grid: C++ QCD library, SIMD performance vs Fortran
 - arXiv:1910.06415 — BACKUS: Modern Fortran performance positioning
 - arXiv:2301.02432 — Myths and Legends in HPC (aliasing analysis)
