@@ -12,7 +12,7 @@ Among the programming languages commonly adopted in scientific computing, C++ oc
 * Native support for parallel programming models
 * Scalability from small applications to large scientific codes
 
-This repository focuses on distributed-memory parallel programming using MPI and provides a collection of examples implemented entirely in modern C++.
+This directory focuses on distributed-memory parallel programming using MPI and provides a collection of examples implemented entirely in modern C++.
 
 ---
 
