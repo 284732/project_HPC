@@ -184,7 +184,7 @@ corresponds to the value passed to `mpirun -np`.
 
 ## 4b. Syntax Differences: Fortran `call` vs C++ Direct Calls
 
-If you are coming from Fortran MPI, three syntactic differences will appear immediately
+Coming from Fortran MPI, three syntactic differences will appear immediately
 in every C++ MPI program.
 
 ### No `call` keyword
