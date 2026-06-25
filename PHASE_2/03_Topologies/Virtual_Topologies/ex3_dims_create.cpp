@@ -1,17 +1,17 @@
 // =============================================================
-// ESERCIZIO 3 — MPI_Dims_create: decomposizione automatica
+// EXERCISE 3 — MPI_Dims_create: Automatic Domain Decomposition
 // =============================================================
-// MPI_Dims_create trova la fattorizzazione più "quadrata" possibile
-// per distribuire 'size' processi su una griglia 2D.
+// MPI_Dims_create finds the most "square" factorization possible
+// to distribute 'size' processes over a 2D grid.
 //
-// Esempi:
+// Examples:
 //   size=4  → dims = [2, 2]
 //   size=6  → dims = [2, 3]
 //   size=8  → dims = [2, 4]
 //   size=12 → dims = [3, 4]
 //
-// Compilazione:  mpicxx -O2 -Wall -o ex3_dims ex3_dims_create.cpp
-// Esecuzione:    mpirun -np 6 ./ex3_dims
+// Compilation:  mpicxx -O2 -Wall -o ex3_dims ex3_dims_create.cpp
+// Execution:    mpirun -np 6 ./ex3_dims
 // =============================================================
 
 #include <mpi.h>
@@ -25,19 +25,19 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // MPI_Dims_create: trova dims ottimale
+    // MPI_Dims_create: find optimal dimensions
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // dims deve essere inizializzato a 0 per le dimensioni libere.
-    // Se metti un valore >0, quella dimensione è fissa.
-    int dims[2] = {0, 0};  // entrambe libere: MPI le determina
+    // dims must be initialized to 0 for dimensions that are free.
+    // If a value > 0 is provided, that dimension is fixed.
+    int dims[2] = {0, 0};  // both dimensions are free: MPI determines them
     MPI_Dims_create(size, 2, dims);
 
     if (rank == 0) {
-        std::cout << "Processi totali: " << size << "\n";
-        std::cout << "Griglia ottimale: " << dims[0] << " x " << dims[1] << "\n\n";
+        std::cout << "Total processes: " << size << "\n";
+        std::cout << "Optimal grid: " << dims[0] << " x " << dims[1] << "\n\n";
     }
 
-    // Crea la topologia con le dimensioni trovate
+    // Create the topology using the computed dimensions
     int periods[2] = {0, 0};
     MPI_Comm comm_cart;
     MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 1, &comm_cart);
@@ -47,9 +47,9 @@ int main(int argc, char* argv[]) {
     MPI_Cart_coords(comm_cart, rank_cart, 2, coords);
 
     MPI_Barrier(comm_cart);
-    std::cout << "Processo " << rank_cart
-              << " → posizione nella griglia: riga=" << coords[0]
-              << ", colonna=" << coords[1] << std::endl;
+    std::cout << "Process " << rank_cart
+              << " → position in the grid: row=" << coords[0]
+              << ", column=" << coords[1] << std::endl;
 
     MPI_Comm_free(&comm_cart);
     MPI_Finalize();
