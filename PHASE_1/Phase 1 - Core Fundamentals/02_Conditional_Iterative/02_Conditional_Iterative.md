@@ -154,15 +154,55 @@ Inside loops:
 There is also `goto`, inherited from C, but in structured programming its use is
 discouraged: in C++ it can almost always be replaced with clearer constructs.
 
-## 8. Example files in this folder
+## 8. `switch` with enumerations
 
-| File                | What it shows                                                  |
-| ------------------- | ------------------------------------------------------------- |
-| `conditionals.cpp`  | `if`/`else if`/`else`, the ternary operator, `switch`         |
-| `loops.cpp`         | `for`, range-based `for`, `while`, `do-while` loops           |
-| `break_continue.cpp`| use of `break` and `continue`, parameter-sweep example        |
+`switch` pairs naturally with **enumerated types**, which give names to a small set of
+discrete values instead of using "magic numbers". The modern form is the strongly typed
+`enum class` (C++11):
 
-## 9. Summary
+```cpp
+enum class State { Idle, Running, Paused, Stopped };
+
+switch (s) {
+    case State::Idle:    /* ... */ break;
+    case State::Running: /* ... */ break;
+    // ...
+}
+```
+
+This makes the code more readable and lets the compiler warn if a case is forgotten. The
+example `enums_switch.cpp` uses this to implement a small state machine.
+
+## 9. Loops and iterative numerical methods
+
+Loops are the backbone of **iterative numerical methods**, where a computation is repeated
+until the result is accurate enough. A typical pattern is a `while` loop that continues as
+long as the error is above a tolerance, with a safety cap on the number of iterations to
+avoid an infinite loop:
+
+```cpp
+while (std::fabs(x * x - a) > tol) {
+    x = 0.5 * (x + a / x);     // Newton step for sqrt(a)
+    ++iters;
+    if (iters >= max_iters) break;
+}
+```
+
+This is shown in `newton_iteration.cpp`, which computes a square root with the
+Newton-Raphson method. The same idea — iterate until convergence — underlies many HPC
+algorithms (linear solvers, optimization, simulations).
+
+## 10. Example files in this folder
+
+| File                  | What it shows                                                  |
+| --------------------- | ------------------------------------------------------------- |
+| `conditionals.cpp`    | `if`/`else if`/`else`, the ternary operator, `switch`         |
+| `loops.cpp`           | `for`, range-based `for`, `while`, `do-while` loops           |
+| `break_continue.cpp`  | use of `break` and `continue`, parameter-sweep example        |
+| `enums_switch.cpp`    | `switch` with an `enum class` (a small state machine)         |
+| `newton_iteration.cpp`| iterative method with convergence (Newton-Raphson square root)|
+
+## 11. Summary
 
 Control flow in C++ is based on conditional constructs (`if`/`else`, `?:`, `switch`) and
 iterative ones (`for`, range-based `for`, `while`, `do-while`). C++ has a native `bool`

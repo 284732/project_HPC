@@ -16,6 +16,9 @@ Phase 1 covers the three subjects assigned to me in Topic 2:
 2. **Conditional and iterative constructs** — `02_Conditional_Iterative/`
 3. **Procedures (functions)** — `03_Procedures/`
 
+A fourth folder, `04_Putting_It_Together/`, contains a small integrative example that
+combines all three topics in a single program.
+
 Each folder contains a theoretical Markdown file (in English) and one or more compilable
 `.cpp` source files that illustrate the concepts with runnable examples.
 
@@ -31,6 +34,7 @@ Each folder contains a theoretical Markdown file (in English) and one or more co
 - Binary I/O with `write()`/`read()` and `std::ios::binary`.
 - Error handling through the **stream state** (`good`, `eof`, `fail`, `bad`) and,
   alternatively, through exceptions.
+- Command-line arguments (`argc`/`argv`) and tabular (CSV) I/O.
 
 ### 2. Conditional and iterative constructs (`02_Conditional_Iterative/`)
 
@@ -38,6 +42,7 @@ Each folder contains a theoretical Markdown file (in English) and one or more co
 - Native boolean type `bool` and relational/logical operators (short-circuit).
 - Iteration: `for` loops, range-based `for` (C++11), `while`, `do-while`.
 - Loop flow control: `break`, `continue`.
+- `switch` with enumerations and iterative numerical methods (convergence).
 
 ### 3. Procedures (`03_Procedures/`)
 
@@ -45,7 +50,14 @@ Each folder contains a theoretical Markdown file (in English) and one or more co
 - Passing by value, by **reference** (`int&`) and by pointer.
 - `const` parameters, function overloading, default arguments.
 - `std::vector` as a parameter and recursion.
+- Functions as parameters (function pointers, lambdas, `std::function`).
+- Separate compilation: header + implementation + main.
 - Variable scope and storage classes (`static`, local/global).
+
+### 4. Putting it together (`04_Putting_It_Together/`)
+
+- A single program that reads parameters from a configuration file, runs a numerical
+  integration in a loop, and writes a report — combining I/O, control flow and functions.
 
 ## Building and running
 

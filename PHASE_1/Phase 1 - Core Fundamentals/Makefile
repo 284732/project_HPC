@@ -1,5 +1,5 @@
 # Makefile - Phase 1 (Topic 2, C++ language)
-# Builds all the examples in the three folders with warnings enabled.
+# Builds all the examples in the four folders with warnings enabled.
 #
 #   make        build all executables
 #   make run    build and run the non-interactive examples
@@ -8,39 +8,57 @@
 CXX      = g++
 CXXFLAGS = -Wall -Wextra -std=c++17 -O2
 
-# Executables (one per .cpp source), generated in their respective folder
+# Single-file executables (one per .cpp source)
 BINS = \
 	01_IO/io_standard \
 	01_IO/io_file_text \
 	01_IO/io_file_binary \
 	01_IO/io_errors \
+	01_IO/io_cmdline_args \
+	01_IO/io_table_csv \
 	02_Conditional_Iterative/conditionals \
 	02_Conditional_Iterative/loops \
 	02_Conditional_Iterative/break_continue \
+	02_Conditional_Iterative/enums_switch \
+	02_Conditional_Iterative/newton_iteration \
 	03_Procedures/functions \
 	03_Procedures/pass_by_ref \
 	03_Procedures/recursion \
-	03_Procedures/scope_static
+	03_Procedures/scope_static \
+	03_Procedures/pointers \
+	03_Procedures/function_params \
+	04_Putting_It_Together/integrate_config
 
-all: $(BINS)
+# Multi-file executable (header + implementation + main)
+MODULAR = 03_Procedures/main_modular
 
-# Generic rule: each executable depends on the .cpp file with the same name
+all: $(BINS) $(MODULAR)
+
+# Generic rule: each single-file executable depends on the .cpp with the same name
 %: %.cpp
 	$(CXX) $(CXXFLAGS) $< -o $@
+
+# Explicit rule for the modular example: compiled and linked from two sources
+$(MODULAR): 03_Procedures/main_modular.cpp 03_Procedures/mathutils.cpp 03_Procedures/mathutils.hpp
+	$(CXX) $(CXXFLAGS) 03_Procedures/main_modular.cpp 03_Procedures/mathutils.cpp -o $(MODULAR)
 
 # Runs the non-interactive examples (io_standard requires input: it is skipped).
 run: all
 	@echo "===== 01_IO ====="
-	@cd 01_IO && ./io_file_text && echo "" && ./io_file_binary && echo "" && ./io_errors
+	@cd 01_IO && ./io_file_text && echo "" && ./io_file_binary && echo "" && ./io_errors && echo "" && ./io_cmdline_args 4 1.5 && echo "" && ./io_table_csv
 	@echo ""
 	@echo "===== 02_Conditional_Iterative ====="
-	@cd 02_Conditional_Iterative && ./conditionals && echo "" && ./loops && echo "" && ./break_continue
+	@cd 02_Conditional_Iterative && ./conditionals && echo "" && ./loops && echo "" && ./break_continue && echo "" && ./enums_switch && echo "" && ./newton_iteration
 	@echo ""
 	@echo "===== 03_Procedures ====="
-	@cd 03_Procedures && ./functions && echo "" && ./pass_by_ref && echo "" && ./recursion && echo "" && ./scope_static
+	@cd 03_Procedures && ./functions && echo "" && ./pass_by_ref && echo "" && ./recursion && echo "" && ./scope_static && echo "" && ./pointers && echo "" && ./function_params && echo "" && ./main_modular
+	@echo ""
+	@echo "===== 04_Putting_It_Together ====="
+	@cd 04_Putting_It_Together && ./integrate_config
 
 clean:
-	rm -f $(BINS)
-	rm -f 01_IO/data.txt 01_IO/data.bin 01_IO/numbers.txt
+	rm -f $(BINS) $(MODULAR)
+	rm -f 01_IO/data.txt 01_IO/data.bin 01_IO/numbers.txt 01_IO/measurements.csv
+	rm -f 04_Putting_It_Together/integration_config.txt 04_Putting_It_Together/integration_result.txt
 
 .PHONY: all run clean

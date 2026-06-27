@@ -157,7 +157,58 @@ The `static` keyword has two relevant uses:
 There is also `const` (and `constexpr`, computed at compile time) to define constants
 safely.
 
-## 9. Example files in this folder
+## 9. Passing by pointer
+
+In addition to references, C++ keeps the **pointer** passing inherited from C. The function
+receives the address of a variable and dereferences it with `*` to read or modify the
+original:
+
+```cpp
+void increment(int* p)
+{
+    if (p != nullptr) {   // a pointer can be null: check before using it
+        ++(*p);
+    }
+}
+...
+int x = 10;
+increment(&x);            // pass the address of x
+```
+
+The practical difference from a reference is exactly that a pointer can be `nullptr`, which
+makes it the natural choice for **optional** output parameters (write the result only if the
+pointer is not null). This is shown in `pointers.cpp`.
+
+## 10. Functions as parameters
+
+A function can receive **another function** as a parameter. This makes a routine generic:
+the same algorithm works on any function supplied by the caller. There are three common
+ways to do it:
+
+- a **function pointer**, `double (*f)(double)`, for ordinary functions;
+- a **lambda**, an anonymous function written inline, possibly capturing variables;
+- `std::function<double(double)>` (header `<functional>`), a general wrapper that accepts
+  both ordinary functions and lambdas.
+
+The example `function_params.cpp` implements a generic **trapezoidal integrator** that
+receives the function to integrate as a parameter — a pattern that appears constantly in
+numerical computing (integrators, solvers, callbacks).
+
+## 11. Separate compilation: a concrete example
+
+In real projects the interface (prototypes) lives in a header and the implementation in a
+`.cpp`. This folder shows a minimal example of this organization:
+
+- `mathutils.hpp` declares a small set of functions inside a `namespace`, protected by an
+  include guard (`#ifndef ... #define ... #endif`);
+- `mathutils.cpp` provides their implementation;
+- `main_modular.cpp` uses them by `#include "mathutils.hpp"`.
+
+The two source files are compiled separately and then linked together (see the `Makefile`
+rule for `main_modular`). Splitting code this way keeps interfaces stable, speeds up
+rebuilds and is the standard structure of larger C++ programs.
+
+## 12. Example files in this folder
 
 | File               | What it shows                                                     |
 | ------------------ | ---------------------------------------------------------------- |
@@ -165,8 +216,11 @@ safely.
 | `pass_by_ref.cpp`  | passing by value, by reference (`&`), `const&` and `std::vector` |
 | `recursion.cpp`    | recursion (factorial, Fibonacci) and comparison with iteration   |
 | `scope_static.cpp` | local/global scope and `static` variables                        |
+| `pointers.cpp`     | passing by pointer, `nullptr`, optional output parameters         |
+| `function_params.cpp` | functions as parameters (function pointer, lambda, `std::function`) |
+| `mathutils.hpp` / `mathutils.cpp` / `main_modular.cpp` | separate compilation (header + implementation + main) |
 
-## 10. Summary
+## 13. Summary
 
 In C++ every procedure is a function, possibly `void`. Functions must be declared
 (prototype) before use, typically through headers that separate interface and
