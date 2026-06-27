@@ -1,22 +1,36 @@
-# 04b — 2D Jacobi Solver with MPI
+# 04b — Jacobi Solver with MPI
 
-## The Physical Problem
-
-We solve the **Poisson equation** on a square domain [0,1]×[0,1]:
-
-```
--∇²u = f(x,y)    inside the domain
- u   = g(x,y)    on the boundary (Dirichlet conditions)
-```
-
-Setting `f=0` reduces it to the **Laplace equation**: the solution represents the
-steady-state temperature distribution given fixed temperatures on the boundaries.
+This module presents two complementary applications of the Jacobi iterative method
+in a distributed-memory environment. The two exercises differ in both the physical
+problem and the parallelization strategy, making them a useful pair for understanding
+how MPI communication patterns depend on the structure of the algorithm.
 
 ---
 
-## The Jacobi Method
+## Exercise 1 — Jacobi 1D Strips: Heat Diffusion on a Grid
 
-Finite difference scheme with a 5-point stencil:
+### The Physical Problem
+
+We solve the **Laplace equation** on a square domain [0,1]×[0,1]:
+
+```
+-∇²u = 0    inside the domain
+ u   = g    on the boundary (Dirichlet conditions)
+```
+
+The solution represents the steady-state temperature distribution given fixed
+temperatures on the boundaries. The boundary conditions used here are:
+
+```
+Top boundary    (row 0):   u = 0.0  (cold)
+Left boundary   (col 0):   u = 0.0
+Right boundary  (col N-1): u = 0.0
+Bottom boundary (row N-1): u = 1.0  (hot)
+```
+
+### The Jacobi Stencil
+
+Finite difference discretization with a 5-point stencil:
 
 ```
          u[i-1][j]
@@ -26,35 +40,33 @@ u[i][j-1] - u[i][j] - u[i][j+1]
          u[i+1][j]
 
 Update: u_new[i][j] = 0.25 * (u[i-1][j] + u[i+1][j] + u[i][j-1] + u[i][j+1])
-                               (for f=0)
 ```
 
-The method iterates until the maximum change between successive solutions drops
-below a threshold ε.
+The method iterates until the maximum pointwise change drops below a threshold ε.
 
----
+### Parallelization Strategy: Domain Decomposition
 
-## Parallelization with MPI
-
-### Domain Decomposition
-
-The global grid (N×N) is divided into horizontal strips:
+The global N×N grid is divided into horizontal strips, one per process:
 
 ```
-Process 0:   rows  0     ..  N/P-1    + ghost row below
-Process 1:   rows  N/P   ..  2N/P-1  + ghost row above and below
+Process 0:   rows  0      ..  N/P-1    + south ghost row
+Process 1:   rows  N/P    ..  2N/P-1  + north and south ghost rows
 ...
-Process P-1: last  N/P rows           + ghost row above
+Process P-1: last  N/P rows            + north ghost row
 ```
+
+Each process holds its local rows plus **ghost rows** — extra rows that store the
+boundary values of the neighboring processes, updated at each iteration via halo
+exchange.
 
 ### Per-Iteration Algorithm
 
 ```
-1. Halo exchange:     swap boundary rows with neighbouring processes
-2. Update all cells:  u_new[i][j] = average(neighbours)
-3. Compute local change: max|u_new - u_old|
-4. MPI_Allreduce(MPI_MAX) → global maximum change
-5. If change < ε → converged → exit
+1. Halo exchange     → MPI_Sendrecv with north and south neighbors
+2. Jacobi update     → u_new[i][j] = 0.25 * sum(neighbors)
+3. Local change      → max|u_new - u_old| over local rows
+4. Global change     → MPI_Allreduce(MPI_MAX) across all processes
+5. Convergence check → exit if global_change < EPS
 ```
 
 ### Iteration Timeline
@@ -62,34 +74,137 @@ Process P-1: last  N/P rows           + ghost row above
 ```
 Iteration k:
   ├── MPI_Sendrecv  (North-South halo exchange)
-  ├── Update local stencil
-  ├── MPI_Allreduce (maximum change)
-  └── Convergence check
+  ├── Jacobi stencil update (local computation)
+  ├── MPI_Allreduce (global convergence check)
+  └── std::swap(u, u_new)
+```
+
+### Files
+
+- `jacobi_1d_strips.cpp` — full implementation
+
+### Compilation and Execution
+
+```bash
+mpicxx -O2 -Wall -o jacobi1d jacobi_1d_strips.cpp
+mpirun -np 4 ./jacobi1d
+```
+
+### Expected Output
+
+```
+[Iter  100] max change = 1.2346e-02
+[Iter  200] max change = 6.2134e-03
+...
+✓ CONVERGENCE reached in 1847 iterations!
+  Final change:      9.87e-07
+  Total time:        0.342 seconds
+  Processes used:    4
 ```
 
 ---
 
-## Exercises
+## Exercise 2 — Jacobi on a Linear System
 
-### Exercise 1 — 1D Jacobi (strips) — `jacobi_1d_strips.cpp`
+### The Problem
 
-Simplified version: decomposition into horizontal strips, North-South exchange only.
+This exercise applies the Jacobi iterative method to solve a **4×4 linear system**
+Ax = b, where each process is responsible for computing one unknown.
 
-### Exercise 2 — Full 2D Jacobi — `jacobi_2d_full.cpp`
+The system solved is:
 
-Full 2D decomposition using a Cartesian topology, halo exchange on all four sides,
-and non-trivial boundary conditions.
+```
+10x₀ -  x₁ + 2x₂        =   6
+-  x₀ + 11x₁ -  x₂ + 3x₃ =  25
+ 2x₀ -  x₁ + 10x₂ -  x₃ = -11
+       3x₁ -  x₂ +  8x₃ =  15
+```
+
+The Jacobi update isolates each unknown on the diagonal:
+
+```
+x₀_new = ( 6     +  x₁ - 2x₂      ) / 10
+x₁_new = ( 25    +  x₀ +  x₂ - 3x₃) / 11
+x₂_new = (-11    - 2x₀ +  x₁ +  x₃) / 10
+x₃_new = ( 15    - 3x₁ +  x₂      ) /  8
+```
+
+The method converges because the matrix is **strictly diagonally dominant**
+(the diagonal entry is larger in absolute value than the sum of all other entries
+in the same row).
+
+### Parallelization Strategy: One Unknown per Process
+
+Unlike the grid-based Jacobi, here the parallelization is at the level of the
+**unknowns**, not the spatial domain:
+
+```
+Process 0 → computes x₀_new
+Process 1 → computes x₁_new
+Process 2 → computes x₂_new
+Process 3 → computes x₃_new
+```
+
+Each process needs the current values of **all** unknowns to compute its update,
+so after each iteration every process must share its new value with all others.
+
+### Per-Iteration Algorithm
+
+```
+1. Each process computes its own x_new (using switch(rank))
+2. Compute local diff = |x_new - x_old|
+3. MPI_Allreduce(MPI_MAX) → global maximum diff across all processes
+4. MPI_Allgather         → distribute all x_new values to all processes
+5. Convergence check     → exit if max_diff < epsilon
+```
+
+### Key MPI Operations
+
+**`MPI_Allreduce`** is used to find the maximum change across all processes — this
+determines whether the iteration has converged:
+
+```cpp
+MPI_Allreduce(&diff, &max_diff, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+```
+
+**`MPI_Allgather`** distributes the newly computed value from each process to all
+others, so that every process has the full updated vector `x[]` before the next
+iteration:
+
+```cpp
+MPI_Allgather(&x_new, 1, MPI_DOUBLE, x, 1, MPI_DOUBLE, MPI_COMM_WORLD);
+```
+
+The combination of these two collectives replaces what in the grid-based Jacobi
+was handled by point-to-point halo exchange — here the communication pattern is
+fully collective because every process needs data from every other process.
+
+### Files
+
+- `Jacobi_linear_system.cpp` — full implementation
+- `output.dat` — solution written by process 0 after convergence
+
+### Compilation and Execution
+
+```bash
+mpicxx -O2 -Wall -o jacobi_ls Jacobi_linear_system.cpp
+mpirun -np 4 ./jacobi_ls
+```
+
+> This exercise requires **exactly 4 processes** (one per unknown).
+
+### Expected Output
+
+The program writes the solution to `output.dat`:
+
+```
+x = 1.00...
+y = 2.00...
+z = -1.00...
+t = 1.00...
+N of iterations : 26
+```
+
+The exact solution of the system is x₀=1, x₁=2, x₂=-1, x₃=1.
 
 ---
-
-## Expected Output
-
-### jacobi_1d_strips (4 processes, 64×64 grid)
-
-```
-[Iter    0] max change = 1.00000e+00
-[Iter  100] max change = 1.23456e-02
-[Iter  500] max change = 2.45e-04
-[Iter 1847] CONVERGED! change = 9.87e-07 < eps = 1e-06
-Total time: 0.342 seconds
-```
