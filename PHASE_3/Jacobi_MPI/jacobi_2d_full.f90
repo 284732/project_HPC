@@ -22,12 +22,13 @@ program jacobi_2d
     ! ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     integer, parameter :: N       = 128
     real(8), parameter :: EPS     = 1.0d-5
-    integer, parameter :: MAX_ITER = 5000
+    integer, parameter :: MAX_ITER = 50000
 
     ! MPI variables
     integer :: rank_world, size_world, ierr
     integer :: rank, coords(2)
-    integer :: dims(2), periods(2)
+    integer :: dims(2)
+    logical :: periods(2)
     integer :: comm_cart
     integer :: north, south, west, east, dummy
 
@@ -67,10 +68,10 @@ program jacobi_2d
     ! 2D Cartesian topology
     ! ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     dims(1)    = 0;  dims(2)    = 0
-    periods(1) = 0;  periods(2) = 0
+    periods(1) = .FALSE.;  periods(2) = .FALSE.
 
     call MPI_Dims_create(size_world, 2, dims, ierr)
-    call MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 1, comm_cart, ierr)
+    call MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, .TRUE., comm_cart, ierr)
     call MPI_Comm_rank(comm_cart, rank, ierr)
     call MPI_Cart_coords(comm_cart, rank, 2, coords, ierr)
 

@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const int N        = 128;   // global N x N grid
     const double EPS   = 1e-5;
-    const int MAX_ITER = 5000;
+    const int MAX_ITER = 50000;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 2D Cartesian topology
