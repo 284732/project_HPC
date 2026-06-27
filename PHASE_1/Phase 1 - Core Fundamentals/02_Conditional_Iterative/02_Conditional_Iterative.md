@@ -1,164 +1,179 @@
-# Costrutti condizionali e iterativi in C
+# Conditional and iterative constructs in C++
 
-## Introduzione
+## Introduction
 
-Il **controllo del flusso** determina quali istruzioni vengono eseguite e quante volte
-vengono ripetute. Senza di esso un programma sarebbe solo una sequenza lineare di
-istruzioni. In C il controllo del flusso si articola in due grandi famiglie:
+**Control flow** determines which instructions are executed and how many times they are
+repeated. Without it, a program would just be a linear sequence of instructions. In C++,
+control flow falls into two large families:
 
-- i **costrutti condizionali** (o di selezione), che eseguono blocchi diversi a seconda
-  di una condizione logica: `if`/`else`, l'operatore ternario `?:` e `switch`;
-- i **costrutti iterativi** (o cicli), che ripetono un blocco finché una condizione
-  resta vera: `for`, `while`, `do-while`, insieme alle istruzioni `break` e `continue`.
+- **conditional constructs** (or selection), which execute different blocks depending on a
+  logical condition: `if`/`else`, the ternary operator `?:` and `switch`;
+- **iterative constructs** (or loops), which repeat a block while a condition stays true:
+  `for`, range-based `for`, `while`, `do-while`, together with the `break` and `continue`
+  statements.
 
-Una particolarità del C, importante da capire fin da subito, riguarda i **valori di
-verità**: il C non ha avuto a lungo un tipo booleano nativo e tratta qualsiasi
-espressione numerica come condizione. Il valore `0` significa *falso*; qualsiasi valore
-diverso da zero significa *vero*. Lo standard C99 ha introdotto il tipo `bool` (con
-`<stdbool.h>`), ma il meccanismo sottostante resta numerico.
+Unlike the original C, C++ has a **native boolean type** `bool`, with the values `true`
+and `false`. Conditions may still use numeric expressions or pointers, which are implicitly
+converted to `bool`: the value `0` (or `nullptr`) is equivalent to `false`, any other value
+to `true`.
 
-## 1. Operatori usati nelle condizioni
+## 1. Operators used in conditions
 
-Le condizioni si costruiscono con operatori **relazionali** e **logici**:
+Conditions are built with **relational** and **logical** operators:
 
-| Categoria   | Operatori                                    |
-| ----------- | -------------------------------------------- |
-| relazionali | `==`  `!=`  `<`  `>`  `<=`  `>=`              |
-| logici      | `&&` (AND), `||` (OR), `!` (NOT)             |
+| Category   | Operators                                     |
+| ---------- | --------------------------------------------- |
+| relational | `==`  `!=`  `<`  `>`  `<=`  `>=`               |
+| logical    | `&&` (AND), `||` (OR), `!` (NOT)              |
 
-Un errore classico è confondere l'assegnamento `=` con il confronto `==`. La scrittura
-`if (x = 5)` assegna 5 a `x` e risulta sempre vera: i compilatori moderni avvisano con
-un warning, motivo per cui conviene sempre compilare con `-Wall`.
+A classic mistake is confusing the assignment `=` with the comparison `==`. Writing
+`if (x = 5)` assigns 5 to `x` and is always true: modern compilers warn about this, which
+is why it is best to always compile with `-Wall`.
 
-Gli operatori `&&` e `||` usano la **valutazione in corto circuito** (*short-circuit*):
-in `a && b`, se `a` è falso `b` non viene nemmeno valutato; in `a || b`, se `a` è vero
-`b` viene saltato. Questo permette idiomi sicuri come `if (p != NULL && p->valore > 0)`.
+The `&&` and `||` operators use **short-circuit evaluation**: in `a && b`, if `a` is false
+`b` is not even evaluated; in `a || b`, if `a` is true `b` is skipped. This allows safe
+idioms such as `if (p != nullptr && p->value > 0)`.
 
 ## 2. `if`, `else if`, `else`
 
-Il costrutto di selezione fondamentale:
+The fundamental selection construct:
 
-```c
-if (condizione) {
-    /* eseguito se condizione è vera (diversa da zero) */
-} else if (altra_condizione) {
-    /* eseguito se la prima è falsa e questa è vera */
+```cpp
+if (condition) {
+    // executed if condition is true
+} else if (other_condition) {
+    // executed if the first is false and this is true
 } else {
-    /* eseguito se tutte le precedenti sono false */
+    // executed if all the previous ones are false
 }
 ```
 
-Le condizioni vengono valutate **in ordine**: appena una risulta vera, il suo blocco
-viene eseguito e gli altri rami vengono saltati. Le parentesi graffe `{ }` non sono
-obbligatorie per un blocco di una sola istruzione, ma usarle sempre è considerata buona
-pratica perché evita errori quando si aggiungono righe in seguito.
+Conditions are evaluated **in order**: as soon as one is true, its block is executed and
+the other branches are skipped. Since C++17 there is also the form with an initializer,
+`if (auto it = ...; condition)`, which limits the scope of a variable to the `if` only.
 
-## 3. Operatore ternario `?:`
+## 3. The ternary operator `?:`
 
-L'operatore ternario è una forma compatta di `if/else` che restituisce un **valore**:
+The ternary operator is a compact form of `if/else` that returns a **value**:
 
-```c
-int massimo = (a > b) ? a : b;
+```cpp
+int maximum = (a > b) ? a : b;
 ```
 
-equivale a "se `a > b` allora `a` altrimenti `b`". È comodo per assegnamenti condizionali
-brevi, ma va usato con misura per non compromettere la leggibilità.
+it is equivalent to "if `a > b` then `a` else `b`". It is handy for short conditional
+assignments, but should be used sparingly so as not to harm readability.
 
 ## 4. `switch`
 
-Quando si deve scegliere tra molti valori discreti di una stessa espressione **intera**,
-`switch` è più chiaro di una lunga catena di `else if`:
+When you have to choose among many discrete values of the same **integer** (or enumerated)
+expression, `switch` is clearer than a long chain of `else if`:
 
-```c
-switch (espressione) {
+```cpp
+switch (expression) {
     case 1:
-        /* ... */
-        break;        /* esce dallo switch */
+        // ...
+        break;        // leaves the switch
     case 2:
-        /* ... */
+        // ...
         break;
     default:
-        /* eseguito se nessun case corrisponde */
+        // executed if no case matches
         break;
 }
 ```
 
-Aspetto cruciale: senza l'istruzione `break`, l'esecuzione **prosegue nel case
-successivo** (comportamento detto *fall-through*). Questo a volte è voluto (più etichette
-che condividono lo stesso codice), ma più spesso un `break` mancante è un bug.
+A crucial point: without the `break` statement, execution **continues into the next case**
+(behaviour called *fall-through*). Sometimes this is intentional (several labels sharing
+the same code), but more often a missing `break` is a bug; in C++17 an intentional
+fall-through can be marked with the `[[fallthrough]];` attribute.
 
-## 5. Cicli `for`
+## 5. `for` loops
 
-Il ciclo `for` è la forma più usata quando il numero di iterazioni è noto o legato a un
-contatore. Ha tre parti separate da punto e virgola:
+The `for` loop is the most used form when the number of iterations is known or tied to a
+counter. It has three parts separated by semicolons:
 
-```c
-for (inizializzazione; condizione; aggiornamento) {
-    /* corpo del ciclo */
-}
-
-for (int i = 0; i < 10; i++) {
-    printf("%d ", i);
+```cpp
+for (int i = 0; i < 10; ++i) {
+    std::cout << i << " ";
 }
 ```
 
-L'inizializzazione viene eseguita una sola volta; la condizione è verificata **prima** di
-ogni iterazione; l'aggiornamento è eseguito **dopo** ogni iterazione. In ambito HPC il
-ciclo `for` su indici è il "cavallo di battaglia" del calcolo numerico (scorrere vettori
-e matrici): la sua struttura prevedibile permette al compilatore ottimizzazioni come
-l'*unrolling* e la vettorizzazione.
+The initialization is executed only once; the condition is checked **before** each
+iteration; the update is executed **after** each iteration. In HPC the `for` loop over
+indices is the "workhorse" of numerical computing (iterating over vectors and matrices):
+its predictable structure allows the compiler optimizations such as *unrolling* and
+vectorization.
 
-## 6. Cicli `while` e `do-while`
+### Range-based `for` (C++11)
 
-Il ciclo `while` verifica la condizione **prima** di ogni iterazione: se è falsa già
-all'inizio, il corpo non viene eseguito nemmeno una volta.
+To iterate over a whole container without manually managing indices, C++ offers the
+range-based `for`:
 
-```c
-while (condizione) {
-    /* corpo */
+```cpp
+std::vector<int> v = {10, 20, 30};
+for (int x : v) {           // a copy of each element
+    std::cout << x << " ";
+}
+for (int& x : v) {          // reference: allows modifying the elements
+    x *= 2;
 }
 ```
 
-Il ciclo `do-while` verifica la condizione **dopo** il corpo, garantendo quindi
-**almeno una** esecuzione:
+It is more concise and less prone to index errors than the classic `for`.
 
-```c
+## 6. `while` and `do-while` loops
+
+The `while` loop checks the condition **before** each iteration: if it is already false at
+the start, the body is not executed even once.
+
+```cpp
+while (condition) {
+    // body
+}
+```
+
+The `do-while` loop checks the condition **after** the body, thus guaranteeing **at least
+one** execution:
+
+```cpp
 do {
-    /* corpo eseguito almeno una volta */
-} while (condizione);
+    // body executed at least once
+} while (condition);
 ```
 
-`do-while` è utile, per esempio, per ripetere la richiesta di un input finché non è
-valido. È tipico dei metodi iterativi che continuano finché non si raggiunge una
-precisione richiesta.
+`do-while` is useful, for example, to repeat an input request until it is valid, or in
+iterative methods that continue until a required precision is reached.
 
-## 7. `break`, `continue` e `goto`
+## 7. `break`, `continue`
 
-All'interno dei cicli:
+Inside loops:
 
-- `break` interrompe immediatamente il ciclo (esce dal ciclo più interno);
-- `continue` salta il resto dell'iterazione corrente e passa alla successiva.
+- `break` immediately interrupts the loop (it exits the innermost loop);
+- `continue` skips the rest of the current iteration and moves to the next one.
 
-Esiste anche `goto`, che salta a un'etichetta nello stesso corpo di funzione. Nella
-programmazione strutturata se ne sconsiglia l'uso, con un'eccezione comune: uscire da
-cicli profondamente annidati o gestire la liberazione delle risorse in caso di errore.
+There is also `goto`, inherited from C, but in structured programming its use is
+discouraged: in C++ it can almost always be replaced with clearer constructs.
 
-## 8. File di esempio in questa cartella
+## 8. Example files in this folder
 
-| File              | Cosa mostra                                                     |
-| ----------------- | -------------------------------------------------------------- |
-| `conditionals.c`  | `if`/`else if`/`else`, operatore ternario, `switch`            |
-| `loops.c`         | cicli `for`, `while`, `do-while`                                |
-| `break_continue.c`| uso di `break` e `continue`, esempio di parameter sweep        |
+| File                | What it shows                                                  |
+| ------------------- | ------------------------------------------------------------- |
+| `conditionals.cpp`  | `if`/`else if`/`else`, the ternary operator, `switch`         |
+| `loops.cpp`         | `for`, range-based `for`, `while`, `do-while` loops           |
+| `break_continue.cpp`| use of `break` and `continue`, parameter-sweep example        |
 
-## 9. Riepilogo
+## 9. Summary
 
-Il controllo del flusso in C si basa su costrutti condizionali (`if`/`else`, `?:`,
-`switch`) e iterativi (`for`, `while`, `do-while`). Le condizioni sono espressioni
-numeriche in cui zero significa falso e qualunque altro valore significa vero. Gli
-operatori logici `&&` e `||` sono valutati in corto circuito. `switch` è adatto alla
-selezione su valori interi discreti, ma richiede attenzione al `break` per evitare il
-fall-through. I cicli `for` su indici sono centrali nel calcolo numerico e sono quelli
-che il compilatore ottimizza più efficacemente, mentre `do-while` garantisce almeno una
-iterazione. `break` e `continue` permettono un controllo fine dell'iterazione.
+Control flow in C++ is based on conditional constructs (`if`/`else`, `?:`, `switch`) and
+iterative ones (`for`, range-based `for`, `while`, `do-while`). C++ has a native `bool`
+type, but conditions also accept numeric expressions and pointers that are implicitly
+converted. The logical operators `&&` and `||` are short-circuit evaluated. `switch` is
+suited to selection over discrete integer/enum values, but requires care with `break`.
+The `for` loops over indices are central to numerical computing and are the ones the
+compiler optimizes most effectively; the range-based `for` makes container traversal
+safer; `do-while` guarantees at least one iteration.
 
+## References
+
+- Bjarne Stroustrup, *The C++ Programming Language*, chapter on selection and iteration.
+- `cppreference` documentation: [Statements](https://en.cppreference.com/w/cpp/language/statements).

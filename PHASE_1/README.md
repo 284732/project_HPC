@@ -1,57 +1,45 @@
-# Il linguaggio C nell'High-Performance Computing
+# The C++ language in High-Performance Computing
 
-## Panoramica del progetto (Topic 2)
+## Project overview (Topic 2)
 
-Questo progetto discute l'uso del linguaggio **C** nel contesto dell'High-Performance
-Computing (HPC), partendo da quanto è stato fatto durante il corso per il linguaggio
-Fortran. Il C è uno dei linguaggi compilati più usati nel calcolo scientifico e di
-sistema: è vicino alla macchina, offre un controllo esplicito della memoria attraverso
-i puntatori ed è il linguaggio in cui sono scritte molte delle librerie numeriche e dei
-runtime (incluso lo stesso MPI) utilizzati in ambito HPC.
+This project discusses the use of the **C++** language in the context of High-Performance
+Computing (HPC). C++ is a compiled, statically typed language that extends C with
+object-oriented programming, templates and a rich standard library (STL). It is widely
+used in high-performance scientific computing because it combines the low-level control
+typical of C with high-level abstractions.
 
-Secondo la consegna, il Topic 2 copre i seguenti argomenti: **I/O, costrutti condizionali
-e iterativi, procedure, array e MPI** (comunicazioni point-to-point e collettive), con un
-caso di studio in cui il C viene usato per risolvere un problema in parallelo.
+The Topic 2 subjects are: **I/O, conditional and iterative constructs, procedures, arrays
+and MPI** (point-to-point and collective communications), together with a case study in
+which the language is used to solve a problem in parallel.
 
-Il lavoro è organizzato in fasi.
+The work is organized in phases.
 
-## Struttura della repository
 
-```text
-PHASE_1/
-|-- Phase 1 - Core Fundamentals/
-|   |-- 01_IO/
-|   |-- 02_Conditional_Iterative/
-|   |-- 03_Procedures/
-|   |-- Makefile
-|   `-- README.md
-|
-`-- README.md
-```
+## My part: Phase 1 - Core Fundamentals
 
-## Phase 1 - Core Fundamentals
+This repository contains **Phase 1**, which I worked on (Giacomo Michelini). The phase
+introduces the C++ fundamentals needed to understand the rest of the project and covers in
+particular the three subjects assigned to me:
 
-Questa repository contiene la **Phase 1** del Topic 2. La fase introduce i fondamenti del linguaggio C necessari a
-comprendere il resto del progetto e copre in particolare i tre argomenti a me assegnati:
+1. **I/O** – input/output with the standard library streams (`std::cin`/`std::cout`,
+   `std::ifstream`/`std::ofstream`, ...).
+2. **Conditional and iterative constructs** – `if`/`else`, `switch`, the ternary
+   operator, `for`, range-based `for`, `while`, `do-while`, `break`/`continue`.
+3. **Procedures (functions)** – definition and prototypes, passing by value, by
+   reference (`&`) and by pointer, `const` parameters, overloading, default arguments,
+   recursion, scope and storage classes.
 
-1. **I/O** – input/output standard (`printf`/`scanf`) e su file (`fopen`, `fprintf`,
-   `fread`/`fwrite`, ...).
-2. **Costrutti condizionali e iterativi** – `if`/`else`, `switch`, operatore ternario,
-   cicli `for`, `while`, `do-while`, `break`/`continue`.
-3. **Procedure (funzioni)** – definizione e prototipi, passaggio per valore e per
-   riferimento, array come parametri, ricorsione, scope e classi di memorizzazione.
+Each subject is documented in a Markdown file (in English) and accompanied by real,
+compilable and runnable `.cpp` source files. Details on how to compile and run the
+examples can be found in the Phase 1 README.
 
-Ogni argomento è documentato in un file Markdown in italiano e accompagnato da file
-sorgente `.c` reali, compilabili ed eseguibili. I dettagli su come compilare ed eseguire
-gli esempi si trovano nel README della Phase 1.
+## Quick build
 
-## Compilazione rapida
-
-Tutti gli esempi sono compilabili con un normale compilatore C (es. `gcc`). Dalla cartella
-`Phase 1 - Core Fundamentals` è sufficiente eseguire:
+All examples can be compiled with a standard C++ compiler (e.g. `g++`). From the
+`Phase 1 - Core Fundamentals` directory:
 
 ```bash
-make        # compila tutti gli esempi
-make run    # compila ed esegue gli esempi non interattivi
-make clean  # rimuove gli eseguibili
+make        # build all examples
+make run    # build and run the non-interactive examples
+make clean  # remove the executables
 ```

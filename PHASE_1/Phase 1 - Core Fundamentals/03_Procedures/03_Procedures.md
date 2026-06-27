@@ -1,180 +1,179 @@
-# Procedure (funzioni) in C
+# Procedures (functions) in C++
 
-## Introduzione
+## Introduction
 
-Una **procedura** è un blocco di codice con un nome, che esegue un compito ben definito e
-può essere richiamato più volte da punti diversi del programma. Suddividere un programma
-in procedure ne migliora la leggibilità, evita la duplicazione del codice e permette di
-ragionare su un problema un pezzo alla volta.
+A **procedure** is a named block of code that performs a well-defined task and can be
+called several times from different points in the program. Splitting a program into
+procedures improves readability, avoids code duplication and lets you reason about a
+problem one piece at a time.
 
-In C tutte le procedure si chiamano **funzioni**: non esiste la distinzione, presente in
-altri linguaggi come il Fortran, tra `function` (che restituisce un valore) e
-`subroutine` (che non lo restituisce). In C una funzione che non deve restituire nulla ha
-semplicemente tipo di ritorno `void`. Lo stesso punto di ingresso del programma, `main`,
-è una funzione.
+In C++ all procedures are called **functions**: a function that does not need to return
+anything has the return type `void`. The program's entry point itself, `main`, is a
+function. Compared with C, C++ adds important tools: **references**, **overloading**
+(several functions with the same name but different signatures) and **default arguments**.
 
-## 1. Definizione di una funzione
+## 1. Defining a function
 
-La forma generale di una funzione è:
+The general form of a function is:
 
-```c
-tipo_di_ritorno nome_funzione(elenco_parametri)
+```cpp
+return_type function_name(parameter_list)
 {
-    /* corpo della funzione */
-    return valore;   /* coerente con tipo_di_ritorno */
+    // function body
+    return value;   // consistent with return_type
 }
 ```
 
-Esempio:
+Example:
 
-```c
-double area_cerchio(double raggio)
+```cpp
+double circle_area(double radius)
 {
     const double PI = 3.14159265358979;
-    return PI * raggio * raggio;
+    return PI * radius * radius;
 }
 ```
 
-Qui `double` è il tipo del valore restituito, `area_cerchio` è il nome, e `double raggio`
-è l'unico parametro. L'istruzione `return` termina la funzione e ne restituisce il
-valore al chiamante. Una funzione `void` può usare `return;` senza valore (o terminare
-semplicemente raggiungendo la fine del corpo).
+The `return` statement terminates the function and returns its value. A `void` function can
+use `return;` with no value, or terminate by reaching the end of the body.
 
-## 2. Dichiarazione (prototipo) e header
+## 2. Declaration (prototype) and headers
 
-In C una funzione deve essere **dichiarata prima di essere usata**, perché il compilatore
-analizza il file dall'alto verso il basso. La dichiarazione, detta **prototipo**, indica
-nome, tipo di ritorno e tipi dei parametri, senza corpo:
+In C++ a function must be **declared before it is used**. The declaration, called a
+**prototype**, gives the name, return type and parameter types, without a body:
 
-```c
-double area_cerchio(double raggio);   /* prototipo: notare il ';' finale */
+```cpp
+double circle_area(double radius);   // prototype: note the trailing ';'
 ```
 
-Il prototipo permette al compilatore di verificare che le chiamate usino il numero e il
-tipo di argomenti corretti. Nei progetti reali i prototipi si raccolgono in **file
-header** (`.h`), inclusi con `#include "mio_header.h"`, mentre le definizioni stanno nei
-file sorgente (`.c`). Questo è l'analogo dei `module` del Fortran: un modo per dichiarare
-l'interfaccia separatamente dall'implementazione.
+The prototype lets the compiler check that calls use the correct number and type of
+arguments. In real projects prototypes are collected in **header files** (`.h`/`.hpp`),
+while definitions go in source files (`.cpp`): this is the standard way to separate
+interface from implementation.
 
-## 3. Passaggio dei parametri: per valore
+## 3. Passing parameters: by value
 
-In C i parametri sono **sempre passati per valore**: alla funzione viene consegnata una
-*copia* dell'argomento. Modificare il parametro all'interno della funzione **non** ha
-effetto sulla variabile del chiamante.
+As in C, by default parameters are **passed by value**: the function receives a *copy* of
+the argument. Modifying the parameter inside the function has **no** effect on the caller's
+variable.
 
-```c
-void prova(int x) { x = 99; }   /* modifica solo la copia locale */
-...
-int a = 1;
-prova(a);
-/* a vale ancora 1 */
+```cpp
+void test(int x) { x = 99; }   // modifies only the local copy
 ```
 
-Questo è un punto centrale del C e spiega molte scelte del linguaggio.
+## 4. Passing by reference
 
-## 4. Passaggio per riferimento tramite puntatori
+C++ introduces **references** (`&`), which are the idiomatic way to let a function modify a
+caller's variable, without the pointer syntax:
 
-Per permettere a una funzione di modificare una variabile del chiamante, si passa il suo
-**indirizzo** (un puntatore). La funzione riceve la copia di un indirizzo, ma attraverso
-quell'indirizzo può accedere e modificare la variabile originale:
-
-```c
-void raddoppia(int *p)   /* p è un puntatore a int */
+```cpp
+void doubleValue(int& r)   // r is a reference (an alias) to the variable passed
 {
-    *p = *p * 2;         /* *p accede alla variabile puntata */
+    r = r * 2;
 }
 ...
 int a = 21;
-raddoppia(&a);           /* si passa l'indirizzo di a */
-/* ora a vale 42 */
+doubleValue(a);            // no '&' at the call site: a becomes 42
 ```
 
-Questo meccanismo è ciò che permette a `scanf("%d", &n)` di riempire la variabile `n`.
-È anche il modo in cui una funzione può "restituire" più di un valore: si passano più
-puntatori come parametri di uscita. Concettualmente corrisponde al passaggio per
-riferimento che in Fortran è il comportamento predefinito.
+A reference is an alias of the original variable: safer than a pointer (it cannot be null
+or "moved"). To return multiple values you can use several output parameters by reference.
+To avoid copying large objects **without** modifying them, a **constant reference**
+`const T&` is used: efficient and safe, a fundamental idiom in HPC when passing bulky
+containers.
 
-## 5. Array come parametri
+The **pointer** form (`int*`) inherited from C is still available, useful when the argument
+can be optional (`nullptr`) or when working with raw memory.
 
-Quando si passa un array a una funzione, in C l'array **decade in un puntatore** al suo
-primo elemento. La funzione non riceve quindi la dimensione dell'array, che va passata
-come parametro separato:
+## 5. `std::vector` as a parameter
 
-```c
-double media(const double v[], int n)
+In C++ `std::vector` is preferred over C's raw arrays: it knows its own size and manages
+memory automatically. Passing it by reference avoids the copy:
+
+```cpp
+double average(const std::vector<double>& v)   // const& : no copy, read-only
 {
-    double somma = 0.0;
-    for (int i = 0; i < n; i++) {
-        somma += v[i];
-    }
-    return somma / n;
+    double sum = 0.0;
+    for (double x : v) sum += x;
+    return sum / v.size();
 }
 ```
 
-Poiché viene passato solo l'indirizzo, la funzione lavora **direttamente** sull'array del
-chiamante (non su una copia): può quindi modificarne gli elementi. La parola chiave
-`const` nel prototipo (`const double v[]`) segnala che la funzione non modificherà
-l'array, aumentando sicurezza e leggibilità. Il fatto che gli array siano passati per
-indirizzo, senza copia, è efficiente ed è uno dei motivi per cui il C è adatto al calcolo
-numerico su grandi quantità di dati.
+If the function must **modify** the vector, it is passed by non-constant reference
+(`std::vector<double>& v`). The fact that containers are passed by reference, without a
+copy, is efficient and is one of the reasons C++ is well suited to numerical computing.
 
-## 6. Ricorsione
+## 6. Overloading and default arguments
 
-Una funzione può richiamare sé stessa: si parla di **ricorsione**. Ogni chiamata
-ricorsiva deve avvicinarsi a un **caso base** che ferma la ricorsione, altrimenti il
-programma non termina (e si esaurisce lo spazio dello stack).
+Two tools typical of C++, absent in C:
 
-```c
-long fattoriale(int n)
+- **Overloading**: several functions with the same name but different parameters; the
+  compiler picks the right one based on the arguments.
+
+  ```cpp
+  int    square(int x)    { return x * x; }
+  double square(double x) { return x * x; }
+  ```
+
+- **Default arguments**: a parameter can have a default value, used if the caller omits it.
+
+  ```cpp
+  double power(double base, int exp = 2);   // exp is 2 if not specified
+  ```
+
+## 7. Recursion
+
+A function can call itself: this is called **recursion**. Each recursive call must move
+closer to a **base case** that stops the recursion, otherwise the program does not
+terminate (and the stack space is exhausted).
+
+```cpp
+long factorial(int n)
 {
-    if (n <= 1) {
-        return 1;          /* caso base */
-    }
-    return n * fattoriale(n - 1);   /* passo ricorsivo */
+    if (n <= 1) return 1;                  // base case
+    return n * factorial(n - 1);           // recursive step
 }
 ```
 
-La ricorsione è elegante per problemi definiti in modo ricorsivo, ma in contesti ad alte
-prestazioni si preferisce spesso la versione iterativa, che evita l'overhead delle
-chiamate di funzione e il rischio di overflow dello stack.
+Recursion is elegant for recursively defined problems, but in high-performance contexts the
+iterative version is often preferred, as it avoids the overhead of function calls and the
+risk of stack overflow.
 
-## 7. Scope e classi di memorizzazione
+## 8. Scope and storage classes
 
-Lo **scope** è la regione del codice in cui un nome è visibile:
+**Scope** is the region of the code in which a name is visible:
 
-- le variabili dichiarate dentro una funzione sono **locali**: esistono solo durante
-  l'esecuzione della funzione e non sono visibili altrove;
-- le variabili dichiarate fuori da ogni funzione sono **globali**: visibili da tutto il
-  file (e da altri file se non `static`).
+- variables declared inside a function are **local**: they exist only while the function is
+  running;
+- variables declared outside any function are **global**: visible to the whole file (and to
+  other files unless `static`).
 
-La parola chiave `static` ha due usi rilevanti:
+The `static` keyword has two relevant uses:
 
-- su una variabile **locale**, ne rende la durata pari all'intero programma: il valore
-  viene conservato tra una chiamata e l'altra della funzione (utile per esempio per un
-  contatore di chiamate);
-- su una variabile o funzione **globale**, ne limita la visibilità al file corrente,
-  evitando conflitti di nomi tra file diversi (incapsulamento).
+- on a **local** variable, it makes its lifetime equal to the whole program: the value is
+  preserved between calls (useful, for example, for a call counter);
+- on a variable or function at file level, it limits its visibility to the current file.
 
-Esiste anche `const`, che rende un valore non modificabile dopo l'inizializzazione, utile
-per definire costanti in modo sicuro.
+There is also `const` (and `constexpr`, computed at compile time) to define constants
+safely.
 
-## 8. File di esempio in questa cartella
+## 9. Example files in this folder
 
-| File              | Cosa mostra                                                       |
-| ----------------- | ---------------------------------------------------------------- |
-| `functions.c`     | definizione e prototipi, valore di ritorno, funzione `void`      |
-| `pass_by_ref.c`   | passaggio per valore vs per riferimento, array come parametri    |
-| `recursion.c`     | ricorsione (fattoriale, Fibonacci) e confronto con la versione iterativa |
-| `scope_static.c`  | scope locale/globale e variabili `static`                        |
+| File               | What it shows                                                     |
+| ------------------ | ---------------------------------------------------------------- |
+| `functions.cpp`    | definition and prototypes, overloading, default arguments, `void`|
+| `pass_by_ref.cpp`  | passing by value, by reference (`&`), `const&` and `std::vector` |
+| `recursion.cpp`    | recursion (factorial, Fibonacci) and comparison with iteration   |
+| `scope_static.cpp` | local/global scope and `static` variables                        |
 
-## 9. Riepilogo
+## 10. Summary
 
-In C ogni procedura è una funzione, eventualmente di tipo `void` se non restituisce un
-valore. Le funzioni vanno dichiarate (prototipo) prima dell'uso, tipicamente tramite file
-header che separano l'interfaccia dall'implementazione. I parametri sono sempre passati
-per valore: per modificare una variabile del chiamante si passa il suo indirizzo
-(puntatore), e questo è anche il modo per restituire più risultati. Gli array decadono in
-puntatori, quindi vengono passati per indirizzo senza copia, cosa efficiente per il
-calcolo numerico. La ricorsione è possibile ma più costosa dell'iterazione. Infine,
-scope e classi di memorizzazione (`static`, `const`, variabili locali/globali) governano
-visibilità e durata delle variabili.
+In C++ every procedure is a function, possibly `void`. Functions must be declared
+(prototype) before use, typically through headers that separate interface and
+implementation. Parameters are passed by value by default; C++ adds references (`&` and
+`const&`) as a safe and efficient way to modify arguments or avoid copying them, in
+addition to the pointer passing inherited from C. `std::vector` is preferred over raw
+arrays. Overloading and default arguments make interfaces more flexible. Recursion is
+possible but more expensive than iteration. Finally, scope and storage classes (`static`,
+`const`/`constexpr`, local/global variables) govern the visibility and lifetime of
+variables.
