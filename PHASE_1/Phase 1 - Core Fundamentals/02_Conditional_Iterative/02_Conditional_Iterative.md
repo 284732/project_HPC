@@ -212,8 +212,3 @@ suited to selection over discrete integer/enum values, but requires care with `b
 The `for` loops over indices are central to numerical computing and are the ones the
 compiler optimizes most effectively; the range-based `for` makes container traversal
 safer; `do-while` guarantees at least one iteration.
-
-## References
-
-- Bjarne Stroustrup, *The C++ Programming Language*, chapter on selection and iteration.
-- `cppreference` documentation: [Statements](https://en.cppreference.com/w/cpp/language/statements).
