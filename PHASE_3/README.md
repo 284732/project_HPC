@@ -6,9 +6,9 @@ This folder collects three C++ programs that tackle the same kind of numerical p
 
 | File | Type | Description |
 |---|---|---|
-| `MC.cpp` | C++ source (sequential) | Estimates the integral of `4/(1+x²)` over `[0,1]` (which converges to π) using the Monte Carlo method, without parallelization. |
-| `integral_mpi.cpp` | C++ source (parallel, MPI) | Computes the same integral using a rectangle-based quadrature method, distributing the workload across MPI processes. |
-`jacobi_2d_full.cpp` / `jacobi_2d_full.f90` | C++ and Fortran 90 source (parallel, MPI) | Two equivalent implementations of a 2D Jacobi heat diffusion solver using a Cartesian topology with 2D domain decomposition and halo exchange, benchmarked against each other. |
+| `MC.cpp` | C++ (sequential) | Estimates the integral of `4/(1+x²)` over `[0,1]` (which converges to π) using the Monte Carlo method, without parallelization. |
+| `integral_mpi.cpp` | C++ (parallel, MPI) | Computes the same integral using a rectangle-based quadrature method, distributing the workload across MPI processes. |
+`jacobi_2d_full.cpp` / `jacobi_2d_full.f90` | C++ and Fortran (parallel, MPI) | Two equivalent implementations of a 2D Jacobi heat diffusion solver using a Cartesian topology with 2D domain decomposition and halo exchange, benchmarked against each other. |
 
 ## Details of the three programs
 
