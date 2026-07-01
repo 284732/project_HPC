@@ -58,15 +58,26 @@ Estimated value = 3.14159
 Computational time = 280 ms.
 ```
 
-### 3. `Jacobi_linear_system.cpp` — Jacobi Method (parallel, MPI)
-Iteratively solves the 4×4 linear system:
-```
-10x -  y + 2z      = 6
--x + 11y -  z + 3t = 25
-2x -  y + 10z -  t = -11
-     3y -  z + 8t   = 15
-```
-The program requires exactly 4 MPI processes, one for each unknown (x, y, z, t). At each iteration, every process computes the new value of its own variable using the values from the other processes at the previous iteration; the maximum difference between old and new value is computed with `MPI_Allreduce` (MAX operation) and used as the stopping criterion (threshold `epsilon = 0.01`); the new values are then shared among all processes with `MPI_Allgather`. The final result and the number of iterations are written to the output file.
+### 3. `jacobi_2d_full.cpp` / `jacobi_2d_full.f90` — 2D Jacobi Heat Diffusion Solver (parallel, MPI, C++ vs Fortran)
+Solves the 2D Jacobi iteration for steady-state heat diffusion on a 128×128 grid, with the bottom boundary fixed at 1.0 and all other boundaries at 0.0. Unlike the previous programs, this one uses a full **2D domain decomposition**: `MPI_Dims_create` automatically computes the best process grid shape, and `MPI_Cart_create` builds a Cartesian topology so each process owns a rectangular subdomain and knows its four neighbors (`MPI_Cart_shift`) — north, south, east, and west.
+
+Each process maintains its subdomain with a **1-cell ghost layer** on every side. At each iteration, boundary values are exchanged with neighboring processes via `MPI_Sendrecv` (halo exchange): rows are sent as contiguous blocks, while columns — non-contiguous in memory — require a derived MPI datatype (`MPI_Type_vector`). After the exchange, each process updates its interior points with the standard 5-point stencil average and computes its local maximum change; `MPI_Allreduce` (MAX) combines these into a global convergence check against the threshold `EPS = 1e-5`.
+
+The C++ and Fortran versions are functionally identical but implemented natively in each language's idioms (indexing, array layout, array swap strategy) and were benchmarked against each other — see `Benchmark.md`, `run_benchmark.sh`, `analyze.py`, and `benchmark_results.csv`.
+
+#### Benchmark results (4 physical cores, N = 128×128)
+
+| lang | np | time (s) | speedup | efficiency |
+|------|----|----------|---------|------------|
+| cpp  | 1  | 0.258    | 1.00    | 100.0%     |
+| cpp  | 2  | 0.149    | 1.73    | 86.6%      |
+| cpp  | 4  | 0.117    | 2.21    | 55.1%      |
+| f    | 1  | 0.206    | 1.00    | 100.0%     |
+| f    | 2  | 0.108    | 1.91    | 95.4%      |
+| f    | 4  | 0.134    | 1.54    | 38.4%      |
+
+Both implementations converge in exactly **8242 iterations** with identical results, confirming numerical equivalence. Fortran is faster at low process counts thanks to its column-major memory layout, which keeps the Jacobi stencil's row-neighbor accesses contiguous — an advantage C++ does not have (row-major layout). At `np = 4`, however, C++ overtakes Fortran: with smaller subdomains (64×64), communication overhead dominates, and C++'s contiguous row-based halo exchange becomes more efficient. Full details and analysis are in `Benchmark.md`.
+
 
 ## Concluding remarks
 Comparing the sequential Monte Carlo run (~26 seconds) with the MPI quadrature run (280 ms) concretely shows the benefit of parallelization on a numerical integration problem, both in terms of speed and accuracy of the result obtained (both converge to the expected value of π ≈ 3.14159). The third program extends the exercise from integral computation to solving linear systems, showcasing a different MPI communication pattern (`Allreduce`/`Allgather` collectives instead of `Bcast`/`Reduce`) typical of component-wise decomposition iterative algorithms.
