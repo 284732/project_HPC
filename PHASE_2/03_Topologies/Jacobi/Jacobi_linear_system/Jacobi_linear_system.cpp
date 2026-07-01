@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <chrono>
-#include <cmath>     // ✅ serve per fabs
+#include <cmath>    
 #include <mpi.h>
 
 using namespace std;
