@@ -76,3 +76,20 @@ out_file << "Integral estimation : " << ((b - a) * (total_sum / n_of_points)) <<
 out_file << "Computational time : " << duration.count() << " ms.";
 out_file.close();
 ```
+
+## Compile & run
+
+For the compilation of this code is possible to use the `gcc` compiler with command `g++` for C++ programming language.
+The commands below are necessary for creating the executable file and the execution of the program.
+```bash
+# CREATION OF THE EXECUTABLE.
+g++ -o mc MC.cpp
+
+# RUN THE EXECUTABLE.
+./mc
+```
+
+## Notes
+- Being purely serial, this implementation is the natural **baseline for execution time** when comparing against a parallel (MPI) version of the same integral estimation.
+- Being a stochastic method, accuracy depends on the number of sample points `n_of_points`: increasing it reduces the statistical error but increases runtime.
+
