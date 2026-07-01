@@ -110,9 +110,14 @@ step = double(interval_amp / iterations);
 step_per_task = step * double(size);
 ```
 
-6. **Local computation**: each process accumulates its own `local_sum` by evaluating the integrand (already multiplied by the step `h`) at each of its assigned points, via the helper function `calculate_function`.
+6. **Local computation**: each process accumulates its own `local_sum` by evaluating the integrand (already multiplied by the step `h`) at each of its assigned points, via the helper function `calculate_function`. 
 
 ```cpp
+// Calculate function code:
+double calculate_function(double x, double step) {
+    return (double(4) * step) / (double(1) + (x*x));
+}
+
 // Each task calculates its local sum.
 for (int i = 0; i < local_tasks; i++) {
     local_sum += calculate_function(x_start, step);
@@ -146,3 +151,63 @@ Also must be present the `return 0` in order to finalize the `void main`.
 MPI_Finalize();
 return 0;
 ```
+
+## Task distribution scheme
+
+The sample points are assigned to processes in an interleaved (round-robin) fashion rather than in contiguous blocks:
+
+```
+Task:     0   1   2   3   0   1   2   3   0   1   2   3   0   1   2   3 ...
+Step:     |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
+          ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼
+      a ──┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴── b
+
+Task 0 → steps: 0, 4, 8, 12, ...
+Task 1 → steps: 1, 5, 9, 13, ...
+Task 2 → steps: 2, 6, 10, 14, ...
+Task 3 → steps: 3, 7, 11, 15, ...
+```
+
+## Compile & run
+
+These are the command that are necessary to create an executable file and to run the executable with **MPI** (2 tasks).
+
+```bash
+# Create the executable
+mpic++ integral_mpi.cpp -o integral_mpi
+
+# Run the executable.
+mpirun -n 2 ./integral_mpi
+```
+
+## Input / Output
+
+**`input.txt`** (must be present in the working directory):
+```
+number_of_iteration: 100000000
+lower_bound: 0.0
+upper_bound: 1.0
+```
+
+**`output.dat`** (example, run with 2 processes):
+```
+Resolution with 2 processes:
+Estimated value = 3.14159
+Computational time = 280 ms.
+```
+
+## Montecarlo VS MPI
+
+| Method | Processes | Estimated value | Error vs π | Computational time |
+|---|---|---|---|---|
+| Monte Carlo (`MC.cpp`, sequential) | 1 | 3.14169 | 0.00010 | 26114 ms |
+| Quadrature (`integral_mpi.cpp`, MPI) | 2 | 3.14159 | 0.00000 | 280 ms |
+
+It is possible to see how the accuracy with **MPI** is almost the same, while there is a strong reduction in computational time with respect to the sequential procedure.
+
+## Notes
+- MPI communication used: `MPI_Bcast` (broadcast parameters), `MPI_Reduce` (sum partial results), `MPI_Barrier` (synchronization for timing).
+- The number of processes must not exceed the number of iterations, otherwise the program exits with an error.
+- Only rank 0 performs file I/O (both reading input and writing output), avoiding race conditions on shared files.
+- Compared to a sequential Monte Carlo approach, this deterministic quadrature method combined with MPI parallelization achieves both higher accuracy and significantly lower execution time.
+
