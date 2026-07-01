@@ -1,4 +1,4 @@
-# PHASE_3 — Parallel Computation of Integrals and Linear Systems with MPI
+# PHASE 3 — Parallel Computation of Integrals and Linear Systems with MPI
 
 This folder collects three C++ programs that tackle the same kind of numerical problem — integration and the solution of linear systems — comparing a **sequential (Monte Carlo)** approach with **parallel MPI-based** approaches (numerical quadrature and the Jacobi method). The educational goal is to observe how parallelization via MPI (Message Passing Interface) affects both correctness and computation time compared to a serial solution, while also practicing with collective communication primitives (`MPI_Bcast`, `MPI_Reduce`, `MPI_Allreduce`, `MPI_Allgather`).
 
