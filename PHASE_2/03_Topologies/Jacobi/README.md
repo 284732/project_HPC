@@ -113,12 +113,18 @@ Ax = b, where each process is responsible for computing one unknown.
 
 The system solved is:
 
-```
-10x₀ -  x₁ + 2x₂        =   6
--  x₀ + 11x₁ -  x₂ + 3x₃ =  25
- 2x₀ -  x₁ + 10x₂ -  x₃ = -11
-       3x₁ -  x₂ +  8x₃ =  15
-```
+<div align="center">
+
+$$
+\begin{cases}
+10x_0 - x_1 + 2x_2 = 6 \\
+-x_0 + 11x_1 - x_2 + 3x_3 = 25 \\
+2x_0 - x_1 + 10x_2 - x_3 = -11\\
+3x_1 - x_2 + 8x_3 = 15
+\end{center}
+$$
+
+</div>
 
 The Jacobi update isolates each unknown on the diagonal:
 
