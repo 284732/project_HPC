@@ -128,12 +128,18 @@ $$
 
 The Jacobi update isolates each unknown on the diagonal:
 
-```
-x₀_new = ( 6     +  x₁ - 2x₂      ) / 10
-x₁_new = ( 25    +  x₀ +  x₂ - 3x₃) / 11
-x₂_new = (-11    - 2x₀ +  x₁ +  x₃) / 10
-x₃_new = ( 15    - 3x₁ +  x₂      ) /  8
-```
+<div align="center">
+
+$$
+\begin{cases}
+x_{0}^{k+1} = \frac{6 + x_1^{k} - 2x_2^{k}}{10} \\
+x_{1}^{k+1} = \frac{25 + x_0^{k} + x_2^{k} - 3x_3^{k}}{11} \\
+x_{2}^{k+1} = \frac{-11 - 2x_0^{k} + x_1^{k} + x_3^{k}}{10} \\
+x_{3}^{k+1} = \frac{15 - 3x_1^{k} + x_2^{k}}{8}
+\end{cases}
+$$
+
+</div>
 
 The method converges because the matrix is **strictly diagonally dominant**
 (the diagonal entry is larger in absolute value than the sum of all other entries
