@@ -38,7 +38,7 @@ $$\int_{a}^{b} f(x) dx \approx (b-a) \cdot \frac{1}{n}\sum_{i=1}^{n} f(x_i)$$
 Process rank 0 reads the parameters from the input file and broadcasts them to all other processes with `MPI_Bcast`. Each process computes how many "steps" (sub-intervals) it is responsible for also handling the remainder of the division and its own partial sum of the integrand function evaluated at equally spaced points. 
 
 ```
-Interval [a, b] divided into sub-intervals, assigned round-robin to 4 tasks:
+Interval [a, b] divided into sub-intervals (for 4 tasks):
 
 Task:     0   1   2   3   0   1   2   3   0   1   2   3   0   1   2   3 ...
           |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
