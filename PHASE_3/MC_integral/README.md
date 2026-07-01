@@ -14,7 +14,7 @@ $$
 
 </div>
 
-It then averages all the computed values and multiplies the result by the interval width $(b - a)$ to estimate the integral:
+It then averages all the computed values and multiplies the result by the interval width $(b - a)$ to estimate the integral with the **Average value theorem**:
 
 <div align="center">
 
