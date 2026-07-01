@@ -35,7 +35,12 @@ $$\int_{a}^{b} f(x) dx \approx (b-a) \cdot \frac{1}{n}\sum_{i=1}^{n} f(x_i)$$
 </div>
 
 ### 2. `integral_mpi.cpp` — Rectangle Quadrature (parallel, MPI)
-Process rank 0 reads the parameters from the input file and broadcasts them to all other processes with `MPI_Bcast`. Each process computes how many "steps" (sub-intervals) it is responsible for — also handling the remainder of the division — and its own partial sum of the integrand function evaluated at equally spaced points. The partial sums are then accumulated on process 0 via `MPI_Reduce`. Computation time is measured between two `MPI_Barrier` calls to ensure all processes are synchronized. The result is written to the output file.
+Process rank 0 reads the parameters from the input file and broadcasts them to all other processes with `MPI_Bcast`. Each process computes how many "steps" (sub-intervals) it is responsible for — also handling the remainder of the division — and its own partial sum of the integrand function evaluated at equally spaced points. The partial sums are then accumulated on process 0 via `MPI_Reduce`. Computation time is measured between two `MPI_Barrier` calls to ensure all processes are synchronized. The result is written to the output file `output.dat` on the following format:
+```
+Resolution with 2 processes:
+Estimated value = 3.14159
+Computational time = 280 ms.
+```
 
 ### 3. `Jacobi_linear_system.cpp` — Jacobi Method (parallel, MPI)
 Iteratively solves the 4×4 linear system:
