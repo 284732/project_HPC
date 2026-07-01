@@ -34,8 +34,24 @@ $$\int_{a}^{b} f(x) dx \approx (b-a) \cdot \frac{1}{n}\sum_{i=1}^{n} f(x_i)$$
 
 </div>
 
-### 2. `integral_mpi.cpp` — Rectangle Quadrature (parallel, MPI)
-Process rank 0 reads the parameters from the input file and broadcasts them to all other processes with `MPI_Bcast`. Each process computes how many "steps" (sub-intervals) it is responsible for — also handling the remainder of the division — and its own partial sum of the integrand function evaluated at equally spaced points. The partial sums are then accumulated on process 0 via `MPI_Reduce`. Computation time is measured between two `MPI_Barrier` calls to ensure all processes are synchronized. The result is written to the output file `output.dat` on the following format:
+### 2. `integral_mpi.cpp` — Integral estimation with MPI
+Process rank 0 reads the parameters from the input file and broadcasts them to all other processes with `MPI_Bcast`. Each process computes how many "steps" (sub-intervals) it is responsible for also handling the remainder of the division and its own partial sum of the integrand function evaluated at equally spaced points. 
+
+```
+Interval [a, b] divided into sub-intervals, assigned round-robin to 4 tasks:
+
+Task:     0   1   2   3   0   1   2   3   0   1   2   3   0   1   2   3 ...
+          |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
+          ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼   ▼
+      a ──┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴── b
+
+Task 0 → steps: 0, 4, 8, 12, ...
+Task 1 → steps: 1, 5, 9, 13, ...
+Task 2 → steps: 2, 6, 10, 14, ...
+Task 3 → steps: 3, 7, 11, 15, ...
+```
+
+The partial sums are then accumulated on process 0 via `MPI_Reduce`. Computation time is measured between two `MPI_Barrier` calls to ensure all processes are synchronized. The result is written to the output file `output.dat` on the following format:
 ```
 Resolution with 2 processes:
 Estimated value = 3.14159
