@@ -52,7 +52,6 @@ int main(int argc, char* argv[]) {
                 break;
         }
 
-        // ✅ usa std::fabs
         diff = std::fabs(x_new - x[rank]);
 
         MPI_Allreduce(&diff, &max_diff, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
@@ -64,7 +63,7 @@ int main(int argc, char* argv[]) {
 
     // Output finale
     if (rank == 0) {
-        ofstream file("output.dat");   // ✅ corretto (niente "w")
+        ofstream file("output.dat"); 
 
         if (!file) {
             cerr << "Errore apertura file!" << endl;
