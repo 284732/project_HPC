@@ -29,7 +29,7 @@ Since $f(x) = \dfrac{4}{1+x^2}$, integrating over $[0, 1]$ gives $\pi$ — so th
 ## How it works
 
 1. **Reads input parameters** from `input.txt`:
-   - Number of random sample points (`n_of_points`)
+   - Number of random sample points (`n_of_points`) and declare it as `int64_t`.
    - Lower bound `a` and upper bound `b` of the integration interval
   
 ```cpp
