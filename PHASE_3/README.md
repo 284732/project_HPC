@@ -15,9 +15,7 @@ This folder collects three C++ programs that tackle the same kind of numerical p
 ### 1. `MC.cpp` — Monte Carlo Integration (sequential)
 Reads the number of sample points and the interval bounds from an input file, generates uniformly distributed random numbers with `mt19937`.
 The system evaluates at each random point the function:
-$$
-4 \cdot \int_{a}^{b} \frac{1}{1 + x^2} \,dx
-$$
+$$4 \cdot \int_{a}^{b} \frac{1}{1 + x^2} \, dx$$
 The two bounds of the interval are read from the `input.txt` file.
 At the end, it sums the value of the rectangle with dimension $$f(x) \cdot h$$, where `h` is the #step (`1.0 / n`) in order to estimate the total integral.
 
