@@ -203,7 +203,7 @@ Computational time = 280 ms.
 | Monte Carlo (`MC.cpp`, sequential) | 1 | 3.14169 | 0.00010 | 26114 ms |
 | Quadrature (`integral_mpi.cpp`, MPI) | 2 | 3.14159 | 0.00000 | 280 ms |
 
-It is possible to see how the accuracy with **MPI** is almost the same, while there is a strong reduction in computational time with respect to the sequential procedure.
+Beyond the massive speed advantage (~93× faster), the MPI quadrature is also deterministic and therefore inherently more accurate than the stochastic Monte Carlo method, which requires an extremely large number of samples to reduce its statistical error to a comparable level.
 
 ## Strong scaling
 
