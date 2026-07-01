@@ -34,6 +34,13 @@ $$\int_{a}^{b} f(x) dx \approx (b-a) \cdot \frac{1}{n}\sum_{i=1}^{n} f(x_i)$$
 
 </div>
 
+The results are writed in `output.txt` file with the following format:
+
+```
+Integral estimation : 3.14169
+Computational time : 26114 ms.
+```
+
 ### 2. `integral_mpi.cpp` — Integral estimation with MPI
 Process rank 0 reads the parameters from the input file and broadcasts them to all other processes with `MPI_Bcast`. Each process computes how many "steps" (sub-intervals) it is responsible for also handling the remainder of the division and its own partial sum of the integrand function evaluated at equally spaced points. 
 
