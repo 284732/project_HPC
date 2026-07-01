@@ -30,9 +30,7 @@ At the end, it averages all the computed values and multiplies the result by the
 
 <div align="center">
 
-$$
-\int_{a}^{b} f(x)\,dx \approx (b-a) \cdot \frac{1}{n}\sum_{i=1}^{n} f(x_i)
-$$
+$$\int_{a}^{b} f(x) dx \approx (b-a) \cdot \frac{1}{n}\sum_{i=1}^{n} f(x_i)$$
 
 </div>
 
