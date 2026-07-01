@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
         iters++;
     }
 
-    // Output finale
+    // Output
     if (rank == 0) {
         ofstream file("output.dat"); 
 
