@@ -205,6 +205,20 @@ Computational time = 280 ms.
 
 It is possible to see how the accuracy with **MPI** is almost the same, while there is a strong reduction in computational time with respect to the sequential procedure.
 
+## Strong scaling
+
+In the following table are reported tha evolution of the values of **efficiency** and **speedup** related to the increasing number of tasks.
+
+| N of tasks | Time [ms] | Theoretical Speedup | Real Speedup | Efficiency |
+|---|---|---|---|---|
+| 1 | 745 | 1 | 1 | 100% |
+| 2 | 394 | 2 | 1.89 | 94.5% |
+| 4 | 222 | 4 | 3.35 | 83.9% |
+| 8 | 120 | 8 | 6.20 | 77.6% |
+
+- The real speedup increases with the number of tasks but progressively diverges from the ideal theoretical speedup (from 1.89 on 2 tasks to 6.20 on 8 tasks): this growing gap is due to communication and synchronization overhead between processes, which becomes increasingly significant relative to the actual computation time as the workload per process decreases.
+- Efficiency decreases steadily as the number of tasks grows (100% → 94.5% → 83.9% → 77.6%), reflecting the fact that communication overhead accounts for a progressively larger share of the total execution time relative to computation, which shrinks as the workload is split across more processes.
+
 ## Notes
 - MPI communication used: `MPI_Bcast` (broadcast parameters), `MPI_Reduce` (sum partial results), `MPI_Barrier` (synchronization for timing).
 - The number of processes must not exceed the number of iterations, otherwise the program exits with an error.
