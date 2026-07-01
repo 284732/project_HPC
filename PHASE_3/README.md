@@ -23,7 +23,7 @@ $$\begin{aligned}
 
 </div>
 The two bounds of the interval are read from the `input.txt` file.
-At the end, it sums the value of the rectangle with dimension $$f(x) \cdot h$$, where `h` is the **step** (`1.0 / n`) in order to estimate the total integral.
+At the end, it sums the value of the rectangle with dimension $$f(x) \cdot h$$, where `h` is the `step` (`1.0 / n`) in order to estimate the total integral.
 
 ### 2. `integral_mpi.cpp` — Rectangle Quadrature (parallel, MPI)
 Process rank 0 reads the parameters from the input file and broadcasts them to all other processes with `MPI_Bcast`. Each process computes how many "steps" (sub-intervals) it is responsible for — also handling the remainder of the division — and its own partial sum of the integrand function evaluated at equally spaced points. The partial sums are then accumulated on process 0 via `MPI_Reduce`. Computation time is measured between two `MPI_Barrier` calls to ensure all processes are synchronized. The result is written to the output file.
