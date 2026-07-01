@@ -89,6 +89,25 @@ g++ -o mc MC.cpp
 ./mc
 ```
 
+## Input & Output
+
+The program is executed with the following input data inserted in `input.txt`.
+
+```
+number_of_iteration: 100000000
+lower_bound: 0.0
+upper_bound: 1.0
+```
+`n_of_points` is declared as `int64_t` in order to be able to read a large integer value because Montecarlo method reduce the error with high number of samples.
+
+The output of the execution is writed on file `output.txt` with the execution time.
+The output data are the following:
+
+```
+Integral estimation : 3.14169
+Computational time : 26114 ms.
+```
+
 ## Notes
 - Being purely serial, this implementation is the natural **baseline for execution time** when comparing against a parallel (MPI) version of the same integral estimation.
 - Being a stochastic method, accuracy depends on the number of sample points `n_of_points`: increasing it reduces the statistical error but increases runtime.
