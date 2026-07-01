@@ -111,4 +111,5 @@ Computational time : 26114 ms.
 ## Notes
 - Being purely serial, this implementation is the natural **baseline for execution time** when comparing against a parallel (MPI) version of the same integral estimation.
 - Being a stochastic method, accuracy depends on the number of sample points `n_of_points`: increasing it reduces the statistical error but increases runtime.
+- Is choosen this kind of structure in order to give the possibility to estimate the integral in other intervals by changing the value of `lower_bound` and `upper_bound` in the input file `input.txt`.
 
