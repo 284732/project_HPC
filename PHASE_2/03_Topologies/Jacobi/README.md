@@ -132,10 +132,10 @@ The Jacobi update isolates each unknown on the diagonal:
 
 $$
 \begin{aligned}
-x_{0}^{k+1} = \frac{6 + x_1^{k} - 2x_2^{k}}{10} \\
-x_{1}^{k+1} = \frac{25 + x_0^{k} + x_2^{k} - 3x_3^{k}}{11} \\
-x_{2}^{k+1} = \frac{-11 - 2x_0^{k} + x_1^{k} + x_3^{k}}{10} \\
-x_{3}^{k+1} = \frac{15 - 3x_1^{k} + x_2^{k}}{8}
+x_{0}^{k+1} &= \frac{6 + x_1^{k} - 2x_2^{k}}{10} \\
+x_{1}^{k+1} &= \frac{25 + x_0^{k} + x_2^{k} - 3x_3^{k}}{11} \\
+x_{2}^{k+1} &= \frac{-11 - 2x_0^{k} + x_1^{k} + x_3^{k}}{10} \\
+x_{3}^{k+1} &= \frac{15 - 3x_1^{k} + x_2^{k}}{8}
 \end{aligned}
 $$
 
