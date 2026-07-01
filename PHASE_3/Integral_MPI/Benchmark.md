@@ -10,7 +10,7 @@ The program numerically approximates:
 <div align="center">
 
 $$
-4 \cdot \int_{a}^{b} \frac{1}{1 + x^2}\dx
+4 \cdot \int_{a}^{b} \frac{1}{1 + x^2}dx
 $$
 
 </div>
