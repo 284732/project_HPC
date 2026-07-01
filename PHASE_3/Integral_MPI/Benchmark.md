@@ -20,7 +20,7 @@ by summing, over `n` equally spaced sample points across `[a, b]`, the value of 
 <div align="center">
 
 $$
-\int_{a}^{b} f(x)\,dx \approx \sum_{i=1}^{n} f(x_i) \cdot h
+\int_{a}^{b} f(x)dx \approx \sum_{i=1}^{n} f(x_i) \cdot h
 $$
 
 </div>
