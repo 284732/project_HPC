@@ -123,8 +123,8 @@ int main(int argc, char* argv[]) {
 
         std::cout
             << (std::abs(total - expected) < 1e-9
-                    ? "✓ CORRECT"
-                    : "✗ ERROR")
+                    ? " CORRECT"
+                    : " ERROR")
             << "\n";
     }
 
