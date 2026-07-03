@@ -2,7 +2,7 @@
 
 **High Performance Computing Project**
 
-**Authors:** Andrea Predieri, Giacomo Michelini, Cattabriga
+**Authors:** Andrea Predieri, Giacomo Michelini, Alberto Cattabriga
 
 This repository contains the project developed for the **High Performance Computing** course as part of the **Master's Degree in Digital Automation Engineering** at the **University of Modena and Reggio Emilia (UNIMORE)**.
 
