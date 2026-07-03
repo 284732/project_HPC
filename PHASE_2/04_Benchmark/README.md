@@ -258,24 +258,6 @@ end do
 
 ---
 
-## 7. Implications for This Tutorial
-
-The C++ code presented in this repository is **performance-equivalent** to the
-corresponding Fortran implementations, with the following considerations:
-
-1. **Inner loops of the Jacobi solver**: the outer loop must iterate over rows (`i`)
-   and the inner loop over columns (`j`) — exactly as written in `jacobi_1d_strips.cpp`.
-   Inverting this order would degrade cache efficiency.
-
-2. **Halo exchange**: `MPI_Sendrecv` in both C++ and Fortran calls the **same
-   underlying C function** — there is no performance difference between the two.
-
-3. **To guarantee Fortran-level performance** in numerical loops, add
-   `-fno-strict-aliasing` to GCC or apply `__restrict__` to raw pointers in
-   performance-critical kernels.
-
----
-
 ## References
 
 - arXiv:2409.06837 — Phase Stability in Chiral Mean-Field Model (C++ vs Fortran benchmark)
