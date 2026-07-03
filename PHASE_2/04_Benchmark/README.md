@@ -248,19 +248,7 @@ end do
 
 ---
 
-## 6. Summary Table
-
-| Criterion | Fortran | C++ |
-|-----------|---------|-----|
-| **Numerical loop performance** | ★★★★★ (no aliasing) | ★★★★☆ (with `__restrict__`) |
-| **Data structure performance** | ★★☆☆☆ | ★★★★★ (STL, templates) |
-| **GPU / accelerators** | ★★★☆☆ (OpenACC, coarray) | ★★★★★ (native CUDA, SYCL) |
-| **Interop with modern libraries** | ★★☆☆☆ (C wrappers) | ★★★★★ (native) |
-| **Readability of scientific code** | ★★★★★ (native arrays) | ★★★☆☆ (verbose) |
-| **Modern tooling** (debugger, sanitizer) | ★★★☆☆ | ★★★★★ |
-| **Library ecosystem** | ★★☆☆☆ (BLAS/LAPACK) | ★★★★★ (Eigen, Boost, ...) |
-| **Presence in legacy HPC codebases** | ★★★★★ (~80% on ARCHER2) | ★★★☆☆ |
-| **Future trend** | ↔ stable in numerical computing | ↑ growing in HPC |
+## 6. Summary
 
 ### In One Sentence
 
