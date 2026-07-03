@@ -330,14 +330,14 @@ Worker 2: ready.
 ### Forgetting `MPI_Init` or `MPI_Finalize`
 
 ```cpp
-// ✗ WRONG: MPI call before Init
+// WRONG: MPI call before Init
 int rank;
 MPI_Comm_rank(MPI_COMM_WORLD, &rank);  // undefined behavior
 MPI_Init(&argc, &argv);
 ```
 
 ```cpp
-// ✗ WRONG: exiting without Finalize
+// WRONG: exiting without Finalize
 MPI_Init(&argc, &argv);
 // ...
 return 0;  // MPI was not shut down correctly
@@ -346,11 +346,11 @@ return 0;  // MPI was not shut down correctly
 ### Printing Without Checking the Rank
 
 ```cpp
-// ✗ OFTEN UNINTENDED: every process prints the same line
+// OFTEN UNINTENDED: every process prints the same line
 // → output repeated once per process
 std::cout << "Final result: " << result << std::endl;
 
-// ✓ CORRECT: only process 0 prints the global result
+// CORRECT: only process 0 prints the global result
 if (rank == 0)
     std::cout << "Final result: " << result << std::endl;
 ```
@@ -358,11 +358,11 @@ if (rank == 0)
 ### Using Uninitialized Buffers in MPI Calls
 
 ```cpp
-// ✗ WRONG: buf is uninitialized; MPI_Recv will write into undefined memory
+// WRONG: buf is uninitialized; MPI_Recv will write into undefined memory
 double buf;
 MPI_Recv(&buf, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-// ✓ CORRECT: always initialize receive buffers
+// CORRECT: always initialize receive buffers
 double buf = 0.0;
 MPI_Recv(&buf, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 ```
