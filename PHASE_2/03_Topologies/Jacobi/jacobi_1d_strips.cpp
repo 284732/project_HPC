@@ -170,11 +170,11 @@ int main(int argc, char* argv[]) {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (rank == 0) {
         if (global_change <= EPS) {
-            std::cout << "\n✓ CONVERGENCE reached in "
+            std::cout << "\n CONVERGENCE reached in "
                       << iter
                       << " iterations!\n";
         } else {
-            std::cout << "\n⚠ MAX_ITER reached without convergence.\n";
+            std::cout << "\n MAX_ITER reached without convergence.\n";
         }
 
         std::cout << "  Final change:      "
