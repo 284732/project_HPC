@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
 
         std::cout << "Process 0: final token received = " << token << std::endl;
         std::cout << "Expected value: " << size - 1 << std::endl;
-        std::cout << (token == size - 1 ? "✓ CORRECT" : "✗ ERROR") << std::endl;
+        std::cout << (token == size - 1 ? " CORRECT" : " ERROR") << std::endl;
 
     } else {
         // -------------------------------------------------------
