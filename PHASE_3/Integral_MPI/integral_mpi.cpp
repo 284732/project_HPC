@@ -49,12 +49,11 @@ if (rank == 0) {
     if (size > iterations) {
         cout << "ERROR : Impossible to solve with a number of iterations lower than the number of tasks!\n";
     }
-    else {
-        // Reads the 2 bounds of the interval.
-        for (int i = 0; i < 2; i++) {
-            getline(in_file, line);
-            bounds[i] = stod(line.substr(line.find(":") + 1));
-        }
+
+    // Reads the 2 bounds of the interval.
+    for (int i = 0; i < 2; i++) {
+        getline(in_file, line);
+        bounds[i] = stod(line.substr(line.find(":") + 1));
     }
     
     in_file.close();
