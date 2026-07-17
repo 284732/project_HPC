@@ -58,15 +58,15 @@ if (rank == 0) {
     in_file.close();
 }
 
-if (size > iterations) {
-    MPI_Finalize();
-    return 0;
-}
-
 // Now, the process 0 must broadcast the number of iterations with the other processes.
 // Arguments : variable register, data count, data type, root process, communicator. 
 MPI_Bcast(&iterations, 1, MPI_INT, 0, MPI_COMM_WORLD);
 MPI_Bcast(&bounds, 2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+if (size > iterations) {
+    MPI_Finalize();
+    return 0;
+}
 
 MPI_Barrier(MPI_COMM_WORLD);
 auto start = high_resolution_clock :: now();
