@@ -1,8 +1,4 @@
 # 01b — Comunicazione Point-to-Point Non Bloccante in MPI
-
-> Guida didattica e autosufficiente alla comunicazione **non-blocking** point-to-point in MPI.
-> Questa guida presuppone la lettura della guida precedente ([01a — Comunicazione Bloccante](./01a-blocking.md)): qui ci concentriamo su **cosa cambia** rispetto al caso bloccante e **perché** questo cambiamento è utile. Se non hai letto la guida su `MPI_Send`/`MPI_Recv`, fallo prima: qui non verranno rispiegati i concetti di rank, communicator, tag e datatype.
-
 ---
 
 ## Indice
