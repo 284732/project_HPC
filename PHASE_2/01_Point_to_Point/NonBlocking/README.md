@@ -274,4 +274,4 @@ Da notare la sequenza logica delle stampe del master: prima annuncia l'avvio del
   * devi avviare molte comunicazioni contemporaneamente e vuoi attenderle insieme in modo efficiente (`MPI_Waitall`);
   * vuoi evitare a priori i rischi di deadlock descritti nella guida 01a, dato che `MPI_Isend`/`MPI_Irecv` non si bloccano mai in attesa di un partner pronto.
 
-Il prezzo da pagare per questi vantaggi è una gestione più attenta del ciclo di vita di ogni comunicazione: ricordare sempre di completare ogni operazione avviata, e rispettare rigorosamente la regola d'oro della sezione 6.
+Il prezzo da pagare per questi vantaggi è una gestione più attenta del ciclo di vita di ogni comunicazione: ricordare sempre di completare ogni operazione avviata.
