@@ -135,9 +135,7 @@ Di conseguenza:
 
 Per questo motivo, il completamento della comunicazione tramite `MPI_Wait`, `MPI_Waitall`, `MPI_Test` o funzioni equivalenti rappresenta il punto in cui l'applicazione riacquista la piena disponibilità del buffer e può accedervi in modo sicuro.
 
-> **Regola pratica:** dopo una chiamata a `MPI_Isend` o `MPI_Irecv`, il buffer coinvolto deve essere considerato **temporaneamente indisponibile** fino al completamento della relativa richiesta MPI. **Regola fondamentale**: tra l'avvio di una `MPI_Isend`/`MPI_Irecv` e il corrispondente completamento (`MPI_Wait` o equivalente), **il buffer passato a quella chiamata è "di proprietà" di MPI**. Il programmatore non deve leggerlo né scriverlo.
-
-Perché questa regola è così importante? Perché la comunicazione non bloccante avviene realmente **in background**, spesso mentre il tuo codice continua a eseguire altre istruzioni. Se nel frattempo modifichi il contenuto del buffer di invio, rischi di spedire dati diversi da quelli che intendevi (magari solo parzialmente aggiornati). Se leggi il buffer di ricezione prima che l'operazione sia completata, potresti leggere dati vecchi, parziali o non definiti, perché MPI potrebbe non aver ancora scritto (o aver scritto solo in parte) il messaggio in arrivo.
+> **Regola pratica:** dopo una chiamata a `MPI_Isend` o `MPI_Irecv`, il buffer coinvolto deve essere considerato **temporaneamente indisponibile** fino al completamento della relativa richiesta MPI. 
 
 ```cpp
 int valore = 10;
