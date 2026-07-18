@@ -21,7 +21,7 @@
 
 ## 1. Definizione e proprietà delle operazioni collettive
 
-Una comunicazione **collettiva** è un'operazione a cui partecipano simultaneamente **tutti** i processi di un communicator, in contrapposizione alle operazioni point-to-point (guide 01a/01b), in cui la comunicazione coinvolge esattamente una coppia sender/receiver identificata esplicitamente per rank.
+Una comunicazione **collettiva** è un'operazione a cui partecipano simultaneamente **tutti** i processi di un communicator, in contrapposizione alle operazioni point-to-point (capitoli 01a/01b), in cui la comunicazione coinvolge esattamente una coppia sender/receiver identificata esplicitamente per rank.
 
 Le collettive non hanno un concetto di "mittente" e "destinatario" nel senso P2P del termine: ogni processo del communicator invoca **la stessa funzione MPI**, con lo stesso `comm`, mettendo a disposizione (o richiedendo) dati secondo un pattern di comunicazione predefinito dalla semantica dell'operazione stessa (broadcast, scatter, gather, reduce, ecc.).
 
