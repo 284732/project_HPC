@@ -33,7 +33,7 @@ La comunicazione **non bloccante** consente a un processo di iniziare un'operazi
 | Quando ritorna la chiamata | Solo a operazione (parzialmente) conclusa | Immediatamente, l'operazione è solo "avviata" |
 | Il processo nel frattempo | È fermo, non fa altro | È libero di eseguire altro codice |
 | Quando i dati sono garantiti pronti | Al ritorno della funzione stessa | Solo dopo una chiamata esplicita di completamento (`MPI_Wait` e simili) |
-| Rischio principale | Deadlock (sezione 6 del capitolo Blocking) | Accesso al buffer prima del completamento (sezione 6 di questa guida) |
+| Rischio principale | Deadlock (sezione 6 del capitolo Blocking) | Accesso al buffer prima del completamento (sezione 6 di questo capitolo) |
 
 La "I" iniziale di `MPI_Isend`/`MPI_Irecv` sta per **Immediate**: la chiamata ritorna immediatamente, senza attendere che l'operazione sia realmente conclusa.
 
