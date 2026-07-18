@@ -225,21 +225,21 @@ Il beneficio è massimo quando comunicazione e calcolo hanno **costi temporali p
 
 ### Esercizio 1 — Isend/Irecv di base (`ex1_nonblocking_basic.cpp`)
 
-Reimplementazione dell'esercizio di ping-pong (già visto nella guida 01a, sezione 10, Esercizio 2) usando `MPI_Isend`/`MPI_Irecv` al posto delle versioni bloccanti.
+Reimplementazione dell'esercizio di ping-pong (già visto nella guida 01a, sezione 9, Esercizio 2) usando `MPI_Isend`/`MPI_Irecv` al posto delle versioni bloccanti.
 
-**Obiettivo didattico:** confrontare direttamente, sullo stesso problema, la struttura del codice bloccante e non bloccante, per rendere tangibile la differenza descritta nella sezione 2 di questa guida (stessa logica applicativa, meccanismo di attesa completamente diverso).
+**Obiettivo:** confrontare direttamente, sullo stesso problema, la struttura del codice bloccante e non bloccante, per rendere tangibile la differenza descritta nella sezione 2 di questo capitolo (stessa logica applicativa, meccanismo di attesa completamente diverso).
 
 ### Esercizio 2 — Overlap calcolo-comunicazione (`ex2_overlap.cpp`)
 
 Ogni processo avvia un invio non bloccante dei propri dati verso un processo vicino e, mentre l'invio è in transito, calcola una somma locale su un altro insieme di dati (che non dipende da quelli in invio). Il tempo di esecuzione viene confrontato con l'equivalente versione puramente bloccante (send seguito da calcolo).
 
-**Obiettivo didattico:** misurare concretamente il vantaggio descritto nella sezione 8: verificare che il tempo totale della versione non bloccante si avvicini al `max(Tcomunicazione, Tcompute)` invece che alla loro somma.
+**Obiettivo:** misurare concretamente il vantaggio descritto nella sezione 8: verificare che il tempo totale della versione non bloccante si avvicini al `max(Tcomunicazione, Tcompute)` invece che alla loro somma.
 
 ### Esercizio 3 — Waitall con comunicazioni multiple (`ex3_waitall.cpp`)
 
 Il processo master avvia contemporaneamente N operazioni di `MPI_Isend` (una per ciascun worker), poi esegue del lavoro indipendente, e infine attende il completamento di tutte le comunicazioni con una singola chiamata a `MPI_Waitall`.
 
-**Obiettivo didattico:** gestire un array di `MPI_Request` per operazioni multiple simultanee (sezione 5) e capire quando `MPI_Waitall` è preferibile a più chiamate separate di `MPI_Wait` in sequenza (più semplice da scrivere, e permette a MPI di completare le richieste nell'ordine più efficiente, non necessariamente quello di avvio).
+**Obiettivo:** gestire un array di `MPI_Request` per operazioni multiple simultanee (sezione 5) e capire quando `MPI_Waitall` è preferibile a più chiamate separate di `MPI_Wait` in sequenza (più semplice da scrivere, e permette a MPI di completare le richieste nell'ordine più efficiente, non necessariamente quello di avvio).
 
 ## 10. Output atteso e come interpretarlo
 
