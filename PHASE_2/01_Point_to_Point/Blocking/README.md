@@ -1,8 +1,5 @@
 # 01a — Comunicazione Point-to-Point Bloccante in MPI
 
-> Guida didattica e autosufficiente alla comunicazione **blocking** point-to-point in MPI (Message Passing Interface).
-> Nessuna conoscenza pregressa di MPI è richiesta: ogni concetto viene introdotto da zero, con esempi, diagrammi e spiegazioni del "perché", non solo del "come".
-
 ---
 
 ## Indice
