@@ -242,7 +242,7 @@ Alcune strategie standard:
 
 3. **Usare comunicazioni non bloccanti** (`MPI_Isend`/`MPI_Irecv`), argomento del capitolo successivo.
 
-L'esercizio 3 (sezione 10) mostra concretamente questo scenario e la sua correzione.
+L'esercizio 3 mostra concretamente questo scenario e la sua correzione.
 
 ## 7. MPI_Barrier: sincronizzazione collettiva bloccante
 
