@@ -300,19 +300,19 @@ if (rank == 0) {
 }
 ```
 
-**Obiettivo didattico:** capire come un unico eseguibile SPMD assuma ruoli diversi a seconda del rank, e come un ciclo `for` lato sender si accoppi a chiamate singole lato receiver.
+**Obiettivo:** capire come un unico eseguibile SPMD assuma ruoli diversi a seconda del rank, e come un ciclo `for` lato sender si accoppi a chiamate singole lato receiver.
 
 ### Esercizio 2 — Ping-Pong (`ex2_pingpong.cpp`)
 
 I processi 0 e 1 si scambiano ripetutamente un valore intero: il processo 0 lo invia al processo 1, che lo incrementa e lo rimanda indietro, e così via per un numero fissato di iterazioni. Il tempo totale viene misurato con `MPI_Wtime()`, la funzione MPI per la misurazione ad alta precisione del tempo trascorso (in secondi, come `double`).
 
-**Obiettivo didattico:** introdurre la misurazione delle prestazioni di comunicazione e il concetto di **latenza** di rete: dato che in un ping-pong il messaggio percorre l'andata e il ritorno (Round-Trip Time, RTT), la latenza di un singolo invio si stima dividendo il tempo medio per iterazione per 2.
+**Obiettivo:** introdurre la misurazione delle prestazioni di comunicazione e il concetto di **latenza** di rete: dato che in un ping-pong il messaggio percorre l'andata e il ritorno (Round-Trip Time, RTT), la latenza di un singolo invio si stima dividendo il tempo medio per iterazione per 2.
 
 ### Esercizio 3 — Deadlock e come evitarlo (`ex3_deadlock.cpp`)
 
 Riproduce concretamente lo scenario descritto nella sezione 6: due processi che eseguono entrambi `MPI_Send` prima di `MPI_Recv`, mostrando (o simulando, a seconda della dimensione del messaggio scelta) il rischio di stallo, seguito dalla versione corretta con l'ordine invertito su uno dei due lati.
 
-**Obiettivo didattico:** riconoscere sul campo un pattern di deadlock e interiorizzare le strategie di prevenzione della sezione 6.2.
+**Obiettivo:** riconoscere sul campo un pattern di deadlock e interiorizzare le strategie di prevenzione della sezione 6.2.
 
 ### Esercizio 4 — Comunicazione ad anello (`ex4_ring.cpp`)
 
@@ -324,7 +324,7 @@ rank_destinatario = (rank + 1) % size
 
 Il processo `0` inizia inviando il token al processo `1`, ciascun processo intermedio lo riceve, lo incrementa, e lo inoltra al successivo; il token compie un giro completo e torna al processo `0`.
 
-**Obiettivo didattico:** applicare l'aritmetica modulare per costruire topologie di comunicazione (qui, un anello) e osservare una sequenza di comunicazioni P2P concatenate, propedeutica ai pattern collettivi più avanzati (es. `MPI_Allreduce` ad anello) trattati in guide successive.
+**Obiettivo:** applicare l'aritmetica modulare per costruire topologie di comunicazione (qui, un anello) e osservare una sequenza di comunicazioni P2P concatenate, propedeutica ai pattern collettivi più avanzati (es. `MPI_Allreduce` ad anello) trattati in guide successive.
 
 ## 10. Output atteso e come interpretarlo
 
@@ -374,5 +374,3 @@ Il token parte da 0 e viene incrementato di 1 ad ogni "salto": dopo un giro comp
 | Il programma funziona con pochi processi/dati piccoli ma si blocca con dati grandi | Comportamento di buffering interno di `MPI_Send` (sezione 5.1): con messaggi piccoli MPI bufferizza e ritorna subito, mascherando un deadlock latente | Non scrivere mai codice che assume implicitamente il buffering di `MPI_Send`; applicare sempre le strategie della sezione 6.2 |
 
 ---
-
-**Prossimi passi consigliati:** una volta padroneggiata la comunicazione bloccante, il passo successivo naturale è lo studio della comunicazione **non bloccante** (`MPI_Isend`, `MPI_Irecv`, `MPI_Wait`), che permette di sovrapporre comunicazione e calcolo evitando molti dei rischi di deadlock descritti in questa guida.
