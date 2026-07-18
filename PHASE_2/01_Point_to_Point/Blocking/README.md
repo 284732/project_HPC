@@ -12,9 +12,9 @@
 6. [Deadlock: la trappola più comune](#6-deadlock-la-trappola-più-comune)
 7. [MPI_Barrier: sincronizzazione collettiva bloccante](#7-mpi_barrier-sincronizzazione-collettiva-bloccante)
 8. [MPI_Status: chi mi ha scritto, cosa, quanto](#8-mpi_status-chi-mi-ha-scritto-cosa-quanto)
-9. [Esercizi guidati](#10-esercizi-guidati)
-10. [Output atteso e come interpretarlo](#11-output-atteso-e-come-interpretarlo)
-11. [Errori comuni e come evitarli](#12-errori-comuni-e-come-evitarli)
+9. [Esercizi guidati](#9-esercizi-guidati)
+10. [Output atteso e come interpretarlo](#10-output-atteso-e-come-interpretarlo)
+11. [Errori comuni e come evitarli](#11-errori-comuni-e-come-evitarli)
 
 ---
 
