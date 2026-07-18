@@ -68,7 +68,7 @@ if (rank == 0) {
 
 ### 2.3 Communicator
 
-Un **communicator** è un gruppo di processi che possono comunicare tra loro. `MPI_COMM_WORLD` è il communicator "di default", creato automaticamente all'avvio, e contiene **tutti** i processi lanciati dal programma. In questa guida useremo sempre `MPI_COMM_WORLD`, ma è utile sapere che MPI permette di creare sotto-gruppi personalizzati (argomento più avanzato, non trattato qui).
+Un **communicator** è un gruppo di processi che possono comunicare tra loro. `MPI_COMM_WORLD` è il communicator "di default", creato automaticamente all'avvio, e contiene **tutti** i processi lanciati dal programma. In generale è spesso usato `MPI_COMM_WORLD`, ma è utile sapere che MPI permette di creare sotto-gruppi personalizzati (vedi capitolo relativo a virtual topologies).
 
 Ogni operazione di comunicazione MPI avviene **all'interno di un communicator**: il rank di un processo è infatti relativo al communicator ("processo 2 in `MPI_COMM_WORLD`" può avere un rank diverso in un altro communicator).
 
