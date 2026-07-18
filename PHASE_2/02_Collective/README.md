@@ -241,7 +241,7 @@ Questo pattern è alla base di algoritmi distribuiti che richiedono una riorgani
 
 ## 8. MPI_Barrier nel contesto delle collettive
 
-`MPI_Barrier` è già stata introdotta nella guida 01a come primitiva di sincronizzazione bloccante; qui va inquadrata correttamente come **caso particolare** di operazione collettiva: rispetta la stessa regola fondamentale (tutti i processi del communicator devono invocarla) ma, a differenza di tutte le altre collettive presentate in questa guida, non trasferisce alcun dato applicativo tra i processi — il suo unico effetto è garantire che nessun processo prosegua oltre la barriera finché tutti gli altri non l'hanno raggiunta.
+`MPI_Barrier` è già stata introdotta nella guida 01a come primitiva di sincronizzazione bloccante; qui va inquadrata correttamente come **caso particolare** di operazione collettiva: rispetta la stessa regola fondamentale (tutti i processi del communicator devono invocarla) ma, a differenza di tutte le altre collettive presentate in questo capitolo , non trasferisce alcun dato applicativo tra i processi — il suo unico effetto è garantire che nessun processo prosegua oltre la barriera finché tutti gli altri non l'hanno raggiunta.
 
 Va sottolineato che `MPI_Barrier` è l'**unica** collettiva per cui lo standard MPI garantisce esplicitamente una sincronizzazione temporale completa tra tutti i partecipanti al ritorno della chiamata. Come discusso nella sezione 1, per le collettive che trasferiscono dati (Bcast, Scatter, Gather, Reduce, ecc.) questa garanzia non sussiste in generale: un processo può in linea di principio ritornare dalla chiamata collettiva prima che altri processi abbiano completato la propria.
 
