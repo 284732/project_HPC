@@ -20,7 +20,7 @@
 
 ## 1. Perché esiste la comunicazione non bloccante
 
-Nella guida precedente abbiamo visto che `MPI_Send` e `MPI_Recv` sono **bloccanti**: il processo chiamante resta fermo su quella riga di codice finché l'operazione non può considerarsi conclusa (per il send: buffer riutilizzabile; per il recv: dati arrivati per intero).
+Nel capitolo precedente si nota che `MPI_Send` e `MPI_Recv` sono **bloccanti**: il processo chiamante resta fermo su quella riga di codice finché l'operazione non può considerarsi conclusa (per il send: buffer riutilizzabile; per il recv: dati arrivati per intero).
 
 Questo comportamento ha un costo evidente: mentre un processo è bloccato in attesa di completare una comunicazione, **non può fare nient'altro**. Se un processo deve inviare dati e poi eseguire un calcolo che non dipende da quei dati, con le primitive bloccanti è comunque costretto ad aspettare la fine della comunicazione prima di iniziare a calcolare, sprecando tempo prezioso.
 
