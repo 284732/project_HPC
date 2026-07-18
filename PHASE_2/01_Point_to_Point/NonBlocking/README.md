@@ -95,9 +95,12 @@ Nota che `MPI_Irecv`, a differenza di `MPI_Recv`, **non richiede** un puntatore 
 
 ## 5. MPI_Request: l'handle dell'operazione in corso
 
-`MPI_Request` è un tipo opaco (una sorta di "ricevuta" o "scontrino") che MPI restituisce quando avvii un'operazione non bloccante. Non contiene i dati del messaggio: è semplicemente un **riferimento** che userai in seguito per chiedere a MPI "è finita l'operazione a cui corrisponde questo scontrino?".
+`MPI_Request` è un tipo definito dallo standard MPI utilizzato per identificare e gestire un'operazione di comunicazione non bloccante. Quando una routine come `MPI_Isend()` o `MPI_Irecv()` viene invocata, la libreria MPI avvia l'operazione di comunicazione e restituisce al chiamante un oggetto di tipo `MPI_Request`, che agisce come un handle associato a tale operazione.
 
-Pensa a `MPI_Isend`/`MPI_Irecv` come al ritiro di un capo in lavanderia: quando consegni i vestiti ti danno uno scontrino (`MPI_Request`), non i vestiti puliti. Solo quando torni con lo scontrino e chiedi "sono pronti?" (`MPI_Wait`) ottieni il risultato effettivo. Nel frattempo, sei libero di fare altro (fase 2 del pattern).
+Un oggetto `MPI_Request` non contiene i dati del messaggio né il risultato della comunicazione; esso rappresenta esclusivamente il riferimento attraverso cui MPI può identificare l'operazione avviata. Grazie a questo handle, il processo può successivamente verificare lo stato della comunicazione o attenderne il completamento mediante routine quali `MPI_Test()`, `MPI_Wait()` e le relative varianti.
+
+La caratteristica fondamentale delle comunicazioni non bloccanti è che la chiamata a `MPI_Isend()` o `MPI_Irecv()` restituisce immediatamente il controllo al programma senza attendere il completamento effettivo del trasferimento dei dati. Ciò consente di sovrapporre attività di calcolo e comunicazione, riducendo il tempo trascorso in attesa e migliorando potenzialmente l'efficienza dell'applicazione parallela.
+Quando vengono avviate più operazioni non bloccanti contemporaneamente, è pratica comune memorizzare i corrispondenti handle in un array di MPI_Request, in cui ogni elemento identifica una specifica operazione di comunicazione. Tale struttura consente di gestire in modo efficiente l'insieme delle comunicazioni pendenti attraverso funzioni come `MPI_Waitall()`, `MPI_Testall()`, `MPI_Waitany()` e `MPI_Testany()`.
 
 Quando si avviano **più** operazioni non bloccanti contemporaneamente, è normale usare un **array di `MPI_Request`**, uno per ciascuna operazione:
 
