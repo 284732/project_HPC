@@ -254,7 +254,7 @@ Il processo master avvia contemporaneamente N operazioni di `MPI_Isend` (una per
 [Worker 3] Received: 300
 ```
 
-Da notare la sequenza logica delle stampe del master: prima annuncia l'avvio delle 3 `MPI_Isend` (fase 1 del pattern, sezione 3), poi stampa che sta eseguendo "altro lavoro" **prima** di aver ricevuto conferma che le comunicazioni siano concluse (fase 2, il calcolo si sovrappone alla comunicazione), e solo dopo la `MPI_Waitall` conferma che tutte e 3 sono terminate (fase 3). I tre worker, essendo processi indipendenti, possono stampare il proprio messaggio di ricezione in un ordine qualsiasi rispetto agli altri worker (l'ordine relativo tra processi diversi non è garantito, come già visto nella guida 01a), ma ciascuno riceve correttamente il valore a lui destinato (`100`, `200`, `300`).
+Da notare la sequenza logica delle stampe del master: prima annuncia l'avvio delle 3 `MPI_Isend` (fase 1 del pattern, sezione 3), poi stampa che sta eseguendo "altro lavoro" **prima** di aver ricevuto conferma che le comunicazioni siano concluse (fase 2, il calcolo si sovrappone alla comunicazione), e solo dopo la `MPI_Waitall` conferma che tutte e 3 sono terminate (fase 3). I tre worker, essendo processi indipendenti, possono stampare il proprio messaggio di ricezione in un ordine qualsiasi rispetto agli altri worker (l'ordine relativo tra processi diversi non è garantito, come già visto nella parte 01a), ma ciascuno riceve correttamente il valore a lui destinato (`100`, `200`, `300`).
 
 ## 11. Errori comuni e come evitarli
 
