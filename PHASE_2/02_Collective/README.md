@@ -1,4 +1,4 @@
-# 03 — Comunicazione Collettiva in MPI
+# 02 — Comunicazione Collettiva in MPI
 
 > Guida di riferimento sulla comunicazione collettiva in MPI. Presuppone la lettura delle guide precedenti (01a — comunicazione bloccante, 01b — comunicazione non bloccante): qui non vengono ridefiniti concetti base come rank, communicator, datatype o tag.
 
