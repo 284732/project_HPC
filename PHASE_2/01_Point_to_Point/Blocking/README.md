@@ -240,7 +240,7 @@ Alcune strategie standard:
 
 2. **Usare `MPI_Sendrecv`**, una funzione che combina invio e ricezione in un'unica chiamata gestita internamente da MPI in modo sicuro (non soggetta a questo tipo di deadlock).
 
-3. **Usare comunicazioni non bloccanti** (`MPI_Isend`/`MPI_Irecv`), argomento che esula da questa guida mirata alla comunicazione bloccante, ma che è la soluzione più generale al problema.
+3. **Usare comunicazioni non bloccanti** (`MPI_Isend`/`MPI_Irecv`), argomento del capitolo successivo.
 
 L'esercizio 3 (sezione 10) mostra concretamente questo scenario e la sua correzione.
 
