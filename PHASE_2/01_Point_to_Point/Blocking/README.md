@@ -178,7 +178,7 @@ Il **tag** è semplicemente un numero intero a scelta del programmatore, utile p
 
 ## 5. Semantica Bloccante: cosa significa davvero "blocking"
 
-Questo è il concetto più frainteso da chi inizia con MPI. "Bloccante" **non** significa "il messaggio è arrivato a destinazione". Significa qualcosa di più sottile e specifico per ciascuna delle due funzioni.
+Il concetto di "Bloccante" **non** significa "il messaggio è arrivato a destinazione". ma qualcosa di piu strutturato.
 
 ### 5.1 MPI_Send bloccante
 
