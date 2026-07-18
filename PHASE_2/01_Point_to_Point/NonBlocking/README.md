@@ -64,7 +64,7 @@ MPI_Wait(&request, MPI_STATUS_IGNORE);
 
 ## 4. MPI_Isend e MPI_Irecv
 
-I prototipi di queste due funzioni sono quasi identici a quelli di `MPI_Send`/`MPI_Recv` visti nella guida precedente, con **due sole differenze**: non ritornano più uno stato di completamento immediato, e richiedono un parametro aggiuntivo, `MPI_Request*`.
+I prototipi di queste due funzioni sono quasi identici a quelli di `MPI_Send`/`MPI_Recv` visti nel capitolo precedente, con **due sole differenze**: non ritornano più uno stato di completamento immediato, e richiedono un parametro aggiuntivo, `MPI_Request*`.
 
 ```cpp
 int MPI_Isend(
