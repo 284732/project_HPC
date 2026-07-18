@@ -11,11 +11,10 @@
 6. [MPI_Reduce e MPI_Allreduce](#6-mpi_reduce-e-mpi_allreduce)
 7. [MPI_Alltoall](#7-mpi_alltoall)
 8. [MPI_Barrier nel contesto delle collettive](#8-mpi_barrier-nel-contesto-delle-collettive)
-9. [Considerazioni algoritmiche e di costo](#9-considerazioni-algoritmiche-e-di-costo)
-10. [MPI_IN_PLACE e gestione dei buffer](#10-mpi_in_place-e-gestione-dei-buffer)
-11. [Esercizi guidati](#11-esercizi-guidati)
-12. [Output atteso e come interpretarlo](#12-output-atteso-e-come-interpretarlo)
-13. [Errori comuni e come evitarli](#13-errori-comuni-e-come-evitarli)
+9. [MPI_IN_PLACE e gestione dei buffer](#9-mpi_in_place-e-gestione-dei-buffer)
+10. [Esercizi guidati](#10-esercizi-guidati)
+11. [Output atteso e come interpretarlo](#11-output-atteso-e-come-interpretarlo)
+12. [Errori comuni e come evitarli](#12-errori-comuni-e-come-evitarli)
 
 ---
 
@@ -245,20 +244,7 @@ Questo pattern è alla base di algoritmi distribuiti che richiedono una riorgani
 
 Va sottolineato che `MPI_Barrier` è l'**unica** collettiva per cui lo standard MPI garantisce esplicitamente una sincronizzazione temporale completa tra tutti i partecipanti al ritorno della chiamata. Come discusso nella sezione 1, per le collettive che trasferiscono dati (Bcast, Scatter, Gather, Reduce, ecc.) questa garanzia non sussiste in generale: un processo può in linea di principio ritornare dalla chiamata collettiva prima che altri processi abbiano completato la propria.
 
-## 9. Considerazioni algoritmiche e di costo
-
-Le implementazioni MPI di produzione (OpenMPI, MPICH e derivati) non implementano le collettive come sequenze naïve di operazioni P2P, ma selezionano dinamicamente, a runtime, tra diversi algoritmi interni, sulla base di fattori quali: dimensione del messaggio, numero di processi nel communicator, topologia fisica dell'interconnessione (rete locale al nodo vs rete tra nodi), e talvolta euristiche configurabili dall'utente tramite variabili d'ambiente specifiche dell'implementazione.
-
-Alcuni pattern algoritmici ricorrenti, utili per ragionare sulle prestazioni attese:
-
-* **Algoritmi ad albero (binomiale o binario)**: usati tipicamente per `MPI_Bcast` e `MPI_Reduce` con messaggi di dimensione piccola/media. Il costo di latenza scala come O(log P), poiché l'informazione si propaga raddoppiando (approssimativamente) il numero di processi coinvolti ad ogni passo.
-* **Algoritmi a pipeline**: usati per messaggi di grandi dimensioni, dove il buffer viene segmentato in chunk più piccoli che vengono inoltrati lungo l'albero di comunicazione in sequenza sovrapposta, così da saturare la banda disponibile invece di essere limitati dalla sola latenza.
-* **Recursive doubling**: usato tipicamente per `MPI_Allreduce`/`MPI_Allgather` con P potenza di 2 (o gestito con varianti per P generico), dove ad ogni passo il numero di processi che possiedono il dato aggregato raddoppia, portando anch'esso a un costo O(log P) passi.
-* **Algoritmi diretti (all-to-all completo)**: usati per `MPI_Alltoall`, dove ogni processo comunica direttamente con ogni altro; per P piccolo questo è spesso preferibile a schemi più complessi, mentre per P grande alcune implementazioni adottano varianti a scambio indiretto per ridurre il numero di connessioni di rete simultanee.
-
-Ai fini pratici di questa guida, il punto rilevante non è memorizzare quale algoritmo specifico venga scelto in quale caso (dettaglio dipendente dall'implementazione e non parte dello standard MPI), ma **avere consapevolezza che le collettive non sono equivalenti, in termini di costo, a un ciclo di operazioni P2P scritto manualmente**: preferire sempre la primitiva collettiva corrispondente quando il pattern di comunicazione lo consente, delegando all'implementazione MPI la scelta dell'algoritmo più efficiente per quel caso specifico.
-
-## 10. MPI_IN_PLACE e gestione dei buffer
+## 9. MPI_IN_PLACE e gestione dei buffer
 
 In diverse collettive (in particolare `MPI_Gather`, `MPI_Allgather`, `MPI_Reduce`, `MPI_Allreduce`, `MPI_Scatter`), MPI mette a disposizione la costante speciale `MPI_IN_PLACE`, utilizzabile al posto del puntatore a `sendbuf` (o, a seconda dell'operazione, `recvbuf`) per indicare che il buffer di input e di output coincidono, evitando così un'allocazione e una copia ridondante.
 
@@ -277,7 +263,7 @@ MPI_Allreduce(MPI_IN_PLACE, &valore, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
 L'uso di `MPI_IN_PLACE` non è solo una comodità sintattica: su buffer di grandi dimensioni evita un'allocazione di memoria aggiuntiva e la copia dei dati che ne conseguirebbe, con un beneficio misurabile sia in termini di footprint di memoria che di tempo di esecuzione. La semantica esatta di `MPI_IN_PLACE` varia leggermente tra le diverse collettive (per `MPI_Gather`/`MPI_Scatter` va passato al posto del parametro relativo al processo non-root vs root, con regole specifiche caso per caso): si consiglia di consultare la documentazione della funzione specifica prima di adottarlo, poiché un uso scorretto porta tipicamente a comportamento indefinito piuttosto che a un errore di compilazione.
 
-## 11. Esercizi guidati
+## 10. Esercizi guidati
 
 ### Esercizio 1 — Bcast e calcolo di PI (`ex1_bcast_pi.cpp`)
 
@@ -303,7 +289,7 @@ Ciascun processo invia una porzione di dati distinta a ciascun altro processo de
 
 **Obiettivo:** comprendere il pattern di comunicazione all-to-all e il suo utilizzo come blocco costruttivo fondamentale per algoritmi FFT distribuiti multi-dimensionali (dove i dati vanno periodicamente ridistribuiti lungo un asse diverso da quello di partizionamento corrente), nonché prendere consapevolezza dell'impatto sul traffico di rete generato (O(P²) messaggi nel communicator, sezione 7), rilevante nella scelta tra questo pattern e alternative basate su comunicazioni P2P mirate quando la matrice di comunicazione è sparsa (ogni processo comunica solo con un sottoinsieme degli altri, non con tutti).
 
-## 12. Output atteso e come interpretarlo
+## 11. Output atteso e come interpretarlo
 
 ### ex1_bcast_pi (eseguito con `-np 4`)
 
@@ -317,7 +303,7 @@ Approximated PI = 3.14159265...  (error: 9.3e-7)
 
 Il numero totale di termini (`N_terms = 1000000`) viene stampato una sola volta dal root, prima della `MPI_Bcast`: dopo la broadcast, tutti i processi possiedono lo stesso valore, ma solo il root ne dà conferma esplicita in output (evitare stampe ridondanti identiche da ogni processo è buona pratica quando l'informazione non varia tra i processi). Ogni processo elabora un intervallo contiguo e disgiunto di indici della serie (partizionamento a blocchi contigui: il processo `i` elabora l'intervallo `[i * N_terms/P, (i+1) * N_terms/P)`), coerentemente con la strategia di parallelizzazione a blocchi tipica di questo genere di calcolo. Il valore finale di π è il risultato della `MPI_Reduce` con `MPI_SUM` sulle somme parziali di ciascun processo; l'errore assoluto riportato (`9.3e-7`) è coerente con la velocità di convergenza nota della serie di Leibniz per il numero di termini scelto, e serve come controllo di correttezza numerica dell'implementazione, non solo di correttezza della comunicazione.
 
-## 13. Errori comuni e come evitarli
+## 12. Errori comuni e come evitarli
 
 | Errore | Causa tipica | Come evitarlo |
 |---|---|---|
