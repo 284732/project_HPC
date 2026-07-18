@@ -80,7 +80,6 @@ Osservazioni implementative rilevanti:
 
 * Il parametro `buf` ha una semantica **dipendente dal rank del chiamante**: sul processo `root` è un buffer di **input** (contiene già il dato da distribuire), su tutti gli altri processi è un buffer di **output** (verrà scritto dalla chiamata). Non esistono due parametri distinti `sendbuf`/`recvbuf` come in altre collettive, perché il dato è identico su ogni processo al termine dell'operazione: un solo buffer è sufficiente concettualmente, anche se ogni processo lo alloca nella propria memoria privata.
 * Il valore di `root` deve essere coerente su tutti i processi chiamanti. Un valore di `root` diverso tra processi diversi produce comportamento indefinito, tipicamente un deadlock o un broadcast da una sorgente inattesa.
-* Dal punto di vista algoritmico, un'implementazione naïve di `MPI_Bcast` come sequenza di `MPI_Send` P2P dal root a ciascun processo avrebbe costo lineare O(P) in numero di processi P, con il root come collo di bottiglia seriale. Le implementazioni MPI di produzione usano invece algoritmi ad albero binario o binomiale (il root invia a 2 processi, ciascuno di questi inoltra a 2 ulteriori processi, e così via), portando il costo a O(log P) passi di comunicazione paralleli, oppure algoritmi a pipeline per messaggi di grandi dimensioni, che segmentano il buffer e sovrappongono la trasmissione dei segmenti successivi lungo l'albero.
 
 ## 4. MPI_Scatter e MPI_Gather
 
