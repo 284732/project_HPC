@@ -180,7 +180,7 @@ for (int i = 0; i < 3; i++) {
 MPI_Waitall(3, requests, statuses);  // aspetta che TUTTI e 3 siano completati
 ```
 
-Nota che `MPI_STATUS_IGNORE` (visto nella guida precedente) ha un equivalente per gli array: `MPI_STATUSES_IGNORE`, da usare con `MPI_Waitall` quando gli status dettagliati non servono.
+Nota che `MPI_STATUS_IGNORE` (visto nel capitolo precedente) ha un equivalente per gli array: `MPI_STATUSES_IGNORE`, da usare con `MPI_Waitall` quando gli status dettagliati non servono.
 
 ## 8. Il vantaggio: sovrapposizione calcolo-comunicazione
 
