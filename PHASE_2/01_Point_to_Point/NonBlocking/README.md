@@ -24,7 +24,7 @@ Nel capitolo precedente si nota che `MPI_Send` e `MPI_Recv` sono **bloccanti**: 
 
 Questo comportamento ha un costo evidente: mentre un processo è bloccato in attesa di completare una comunicazione, **non può fare nient'altro**. Se un processo deve inviare dati e poi eseguire un calcolo che non dipende da quei dati, con le primitive bloccanti è comunque costretto ad aspettare la fine della comunicazione prima di iniziare a calcolare, sprecando tempo prezioso.
 
-La comunicazione **non bloccante** (o *asincrona*) risolve questo problema: permette di **avviare** un'operazione di invio o ricezione e **continuare subito** con altro codice, mentre la comunicazione vera e propria procede "in background" (gestita dall'hardware di rete e/o da un thread di supporto della libreria MPI). Solo in un secondo momento, quando i dati servono davvero, il programma si sincronizza esplicitamente per assicurarsi che l'operazione sia completata.
+La comunicazione **non bloccante** consente a un processo di iniziare un'operazione di invio o ricezione senza attendere il suo completamento. Dopo la chiamata, il processo può proseguire con altre elaborazioni. L'effettivo avanzamento della comunicazione dipende dall'implementazione MPI e può avvenire durante l'esecuzione di successive chiamate MPI o attraverso meccanismi interni della libreria. Il completamento dell'operazione viene infine verificato mediante primitive dedicate, come MPI_Wait o MPI_Test.
 
 ## 2. Blocking vs Non-Blocking: la differenza in una frase
 
