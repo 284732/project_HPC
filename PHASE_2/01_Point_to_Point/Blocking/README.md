@@ -12,10 +12,9 @@
 6. [Deadlock: la trappola più comune](#6-deadlock-la-trappola-più-comune)
 7. [MPI_Barrier: sincronizzazione collettiva bloccante](#7-mpi_barrier-sincronizzazione-collettiva-bloccante)
 8. [MPI_Status: chi mi ha scritto, cosa, quanto](#8-mpi_status-chi-mi-ha-scritto-cosa-quanto)
-9. [Compilare ed eseguire un programma MPI](#9-compilare-ed-eseguire-un-programma-mpi)
-10. [Esercizi guidati](#10-esercizi-guidati)
-11. [Output atteso e come interpretarlo](#11-output-atteso-e-come-interpretarlo)
-12. [Errori comuni e come evitarli](#12-errori-comuni-e-come-evitarli)
+9. [Esercizi guidati](#10-esercizi-guidati)
+10. [Output atteso e come interpretarlo](#11-output-atteso-e-come-interpretarlo)
+11. [Errori comuni e come evitarli](#12-errori-comuni-e-come-evitarli)
 
 ---
 
@@ -287,21 +286,7 @@ MPI_Recv(buf, count, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
 Questo evita un piccolo overhead ed è considerata buona pratica quando lo status non serve.
 
-## 9. Compilare ed eseguire un programma MPI
-
-Per chi non ha ancora familiarità con il flusso di lavoro MPI: i programmi si compilano con un wrapper del compilatore C++ (`mpic++`, o `mpicxx`) che aggiunge automaticamente i percorsi di include e le librerie MPI, e si eseguono con `mpirun` (o `mpiexec`), specificando quanti processi lanciare con `-np`.
-
-```bash
-# Compilazione
-mpic++ -o ex1_hello ex1_hello.cpp
-
-# Esecuzione con 4 processi
-mpirun -np 4 ./ex1_hello
-```
-
-Ogni riga stampata da un processo diverso è prefissata (in questa repository) con `[Process N]`, per rendere chiaro quale processo ha generato quale output — utile perché **l'ordine di interleaving dell'output tra processi diversi non è garantito** da MPI.
-
-## 10. Esercizi guidati
+## 9. Esercizi guidati
 
 ### Esercizio 1 — Hello con Send/Recv (`ex1_hello.cpp`)
 
@@ -341,7 +326,7 @@ Il processo `0` inizia inviando il token al processo `1`, ciascun processo inter
 
 **Obiettivo didattico:** applicare l'aritmetica modulare per costruire topologie di comunicazione (qui, un anello) e osservare una sequenza di comunicazioni P2P concatenate, propedeutica ai pattern collettivi più avanzati (es. `MPI_Allreduce` ad anello) trattati in guide successive.
 
-## 11. Output atteso e come interpretarlo
+## 10. Output atteso e come interpretarlo
 
 ### ex1_hello (eseguito con `-np 4`)
 
@@ -378,7 +363,7 @@ Process 0 receives final token = 3 ✓
 
 Il token parte da 0 e viene incrementato di 1 ad ogni "salto": dopo un giro completo su 4 processi, il valore finale ricevuto dal processo 0 è `3` (cioè `size - 1`), a conferma che il token ha attraversato correttamente tutti gli altri processi esattamente una volta.
 
-## 12. Errori comuni e come evitarli
+## 11. Errori comuni e come evitarli
 
 | Errore | Causa tipica | Come evitarlo |
 |---|---|---|
