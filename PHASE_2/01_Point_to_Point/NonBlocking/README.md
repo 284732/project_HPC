@@ -115,12 +115,12 @@ MPI_Isend(buf2, count, MPI_INT, dest2, tag, comm, &requests[2]);
 
 > ⚠️Regola fondamentale
 > Tra l'avvio di una comunicazione non bloccante (`MPI_Isend` o `MPI_Irecv`) e il suo completamento mediante `MPI_Wait`, `MPI_Waitall`, `MPI_Test` o funzioni equivalenti, il buffer coinvolto nella comunicazione **non deve essere utilizzato dall'applicazione**.
-
+>
 > In particolare:
-
+>
 > - il **buffer di invio** non deve essere modificato;
 > - il **buffer di ricezione** non deve essere letto né modificato.
-
+>
 > Questa restrizione rimane valida fino a quando l'operazione di comunicazione non risulta completata.
 
 ## Perché questa regola è fondamentale?
