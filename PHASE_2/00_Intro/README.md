@@ -79,7 +79,8 @@ Gli array grezzi sono altrettanto frequentemente usati, con proprietà di contig
 double x[3] = {1.0, 2.0, 3.0};
 ```
 
-Entrambe le rappresentazioni possono essere passate direttamente alle routine di comunicazione MPI, poiché MPI opera a livello di indirizzi di memoria grezzi (`void*`) e non ha nozione del tipo C++ del contenitore usato per allocare quella memoria: ciò che conta, ai fini di MPI, è che il buffer sia effettivamente contiguo e che il `datatype`/`count` dichiarati nella chiamata MPI corrispondano fedelmente al layout reale dei dati.
+Entrambe le rappresentazioni possono essere utilizzate direttamente nelle chiamate MPI perché MPI non conosce il tipo C++ del contenitore (ad esempio std::vector, array statici o memoria allocata dinamicamente). Le routine MPI ricevono semplicemente un indirizzo di memoria (void*) e interpretano i dati in base alle informazioni fornite dall'utente tramite i parametri datatype e count.
+Per questo motivo, ciò che conta non è il contenitore utilizzato, ma il fatto che i dati siano memorizzati in modo contiguo in memoria. Inoltre, il tipo MPI specificato (ad esempio MPI_INT, MPI_DOUBLE, ecc.) e il numero di elementi dichiarato devono corrispondere esattamente alla reale disposizione dei dati nel buffer, affinché MPI possa leggere o scrivere correttamente la memoria.
 
 ## 4. Librerie numeriche
 
