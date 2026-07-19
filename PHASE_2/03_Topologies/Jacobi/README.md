@@ -1,4 +1,4 @@
-# 03b — Solutore di Jacobi in MPI
+# 03a — Solutore di Jacobi in MPI
 
 > Capitolo di riferimento sul metodo iterativo di Jacobi applicato in ambiente a memoria distribuita. Presuppone la lettura dei capitoli precedenti (01a/01b — comunicazione point-to-point, 02 — comunicazione collettiva): qui `MPI_Allreduce` e `MPI_Allgather` vengono riutilizzate senza essere ridefinite da zero, mentre `MPI_Sendrecv` viene introdotta ex novo, essendo la prima occorrenza.
 >
