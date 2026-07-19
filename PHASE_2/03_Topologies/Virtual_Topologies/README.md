@@ -11,11 +11,10 @@
 3. [Corrispondenza tra rank e coordinate: ordinamento row-major](#3-corrispondenza-tra-rank-e-coordinate-ordinamento-row-major)
 4. [MPI_Cart_coords e MPI_Cart_rank](#4-mpi_cart_coords-e-mpi_cart_rank)
 5. [MPI_Cart_shift: individuazione dei vicini](#5-mpi_cart_shift-individuazione-dei-vicini)
-6. [MPI_Cart_sub: sotto-comunicatori della griglia](#6-mpi_cart_sub-sotto-comunicatori-della-griglia)
-7. [MPI_Dims_create: bilanciamento automatico delle dimensioni](#7-mpi_dims_create-bilanciamento-automatico-delle-dimensioni)
-8. [Esercizi guidati](#8-esercizi-guidati)
-9. [Output atteso e come interpretarlo](#9-output-atteso-e-come-interpretarlo)
-10. [Errori comuni e come evitarli](#10-errori-comuni-e-come-evitarli)
+6. [MPI_Dims_create: bilanciamento automatico delle dimensioni](#6-mpi_dims_create-bilanciamento-automatico-delle-dimensioni)
+7. [Esercizi guidati](#7-esercizi-guidati)
+8. [Output atteso e come interpretarlo](#8-output-atteso-e-come-interpretarlo)
+9. [Errori comuni e come evitarli](#9-errori-comuni-e-come-evitarli)
 
 ---
 
@@ -184,49 +183,7 @@ EAST  (direction=1, disp=+1): P5  (rank=5, coords=(1,2))
 
 Da notare la corrispondenza: `direction=0` agisce sulla prima coordinata (`coords[0]`, la riga), quindi produce vicini in direzione verticale (nord/sud); `direction=1` agisce sulla seconda coordinata (`coords[1]`, la colonna), producendo vicini in direzione orizzontale (est/ovest). Questa corrispondenza `direction ↔ asse geometrico` è una convenzione applicativa (nord/sud/est/ovest sono etichette scelte dal programmatore in base a come interpreta le due dimensioni della griglia), non un vincolo imposto dallo standard MPI, che tratta `direction` semplicemente come indice di una delle `ndims` dimensioni astratte della griglia.
 
-## 6. MPI_Cart_sub: sotto-comunicatori della griglia
-
-`MPI_Cart_sub` permette di partizionare una topologia cartesiana esistente in **sotto-griglie** di dimensione inferiore, creando nuovi communicator che raggruppano i processi lungo un sottoinsieme delle dimensioni originali. È l'operazione fondamentale per implementare algoritmi che richiedono comunicazioni collettive ristrette a una singola riga o a una singola colonna della griglia, anziché all'intero insieme di processi.
-
-```cpp
-int MPI_Cart_sub(
-    MPI_Comm  comm_cart,     // il communicator con topologia cartesiana di partenza
-    const int remain_dims[], // array di ndims booleani (0/1): remain_dims[i]=1
-                              // indica che la dimensione i-esima viene MANTENUTA
-                              // (i processi restano distinti lungo quell'asse
-                              // nel nuovo sotto-communicator); remain_dims[i]=0
-                              // indica che quella dimensione viene "raggruppata"
-                              // (i processi che differiscono SOLO lungo quell'asse
-                              // finiscono nello STESSO sotto-communicator)
-    MPI_Comm* newcomm        // OUTPUT: il nuovo sotto-communicator. Ogni processo
-                              // chiamante riceve l'handle del sotto-communicator
-                              // a cui appartiene in base alle proprie coordinate
-                              // nelle dimensioni "raggruppate" (remain_dims[i]=0)
-);
-```
-
-Il significato di `remain_dims` è la parte più controintuitiva di questa funzione, ed è facile confonderla con il proprio opposto. La chiave di lettura corretta è: **la dimensione "mantenuta" (`remain_dims[i]=1`) è quella lungo cui i processi del nuovo sotto-communicator restano distinti** (è la dimensione "interna" al sotto-communicator risultante); **la dimensione "non mantenuta" (`remain_dims[i]=0`) è quella usata per determinare il raggruppamento**: tutti i processi che condividono le stesse coordinate nelle dimensioni non mantenute, e che quindi differiscono solo lungo la dimensione azzerata, finiscono nello stesso sotto-communicator.
-
-```cpp
-int remain_dims_row[] = {0, 1};  // dimensione 0 (riga) NON mantenuta → usata per
-                                  // il raggruppamento: tutti i processi con la
-                                  // STESSA riga finiscono nello stesso comm
-                                  // dimensione 1 (colonna) mantenuta → restano
-                                  // distinti all'interno di ogni comm risultante
-                                  // → RISULTATO: un communicator per ogni RIGA
-                                  //    della griglia originale
-int remain_dims_col[] = {1, 0};  // simmetricamente: un communicator per ogni
-                                  // COLONNA della griglia originale
-MPI_Comm comm_row, comm_col;
-MPI_Cart_sub(comm_cart, remain_dims_row, &comm_row);
-MPI_Cart_sub(comm_cart, remain_dims_col, &comm_col);
-```
-
-Per la griglia 4×3 di sezione 3, `MPI_Cart_sub` con `remain_dims_row = {0,1}` produce **4 comunicatori distinti** (uno per riga), ciascuno contenente i 3 processi di quella riga (ad esempio, il communicator prodotto per la riga 1 contiene P3, P4, P5); ogni processo, invocando `MPI_Cart_sub` con questi argomenti, riceve nell'output `comm_row` l'handle del communicator corrispondente **alla propria riga** — non un unico communicator globale, ma uno specifico per il sottoinsieme a cui il processo chiamante appartiene, determinato automaticamente dalle sue coordinate correnti nella dimensione raggruppata.
-
-L'utilità pratica emerge quando si combinano questi sotto-communicator con operazioni collettive: ad esempio, una `MPI_Allreduce` invocata su `comm_row` calcola un risultato aggregato **per ogni riga indipendentemente** (ogni riga ottiene il proprio risultato, calcolato solo sui processi di quella riga), un pattern comune in algoritmi di algebra lineare distribuita (es. fattorizzazioni a blocchi, prodotti matrice-matrice distribuiti secondo schemi 2D come l'algoritmo di Cannon o SUMMA), dove è necessario aggregare dati lungo una sola dimensione della griglia di processi alla volta, mantenendo le altre righe/colonne indipendenti tra loro.
-
-## 7. MPI_Dims_create: bilanciamento automatico delle dimensioni
+## 6. MPI_Dims_create: bilanciamento automatico delle dimensioni
 
 Scegliere manualmente `dims[]` per `MPI_Cart_create` richiede di conoscere a priori una fattorizzazione del numero di processi P che produca una griglia ragionevolmente bilanciata. `MPI_Dims_create` automatizza questa scelta:
 
@@ -272,7 +229,7 @@ MPI_Dims_create(size, 2, dims);
 
 Se il numero di processi `nnodes` non ammette una fattorizzazione compatibile con i vincoli già fissati dal chiamante (ad esempio richiedere `dims[0]=5` con `size=12`, che non è divisibile per 5), la chiamata è un errore MPI. È inoltre importante notare che, se **tutte** le dimensioni sono già state fissate esplicitamente dal chiamante (nessun valore a 0 in ingresso), `MPI_Dims_create` si limita a verificarne la consistenza rispetto a `nnodes` (il prodotto deve corrispondere esattamente), senza modificare alcun valore.
 
-## 8. Esercizi guidati
+## 7. Esercizi guidati
 
 ### Esercizio 1 — Creazione della griglia e stampa dei vicini (`ex1_cart_create.cpp`)
 
@@ -292,7 +249,7 @@ Utilizza `MPI_Dims_create` per determinare automaticamente la decomposizione pi�
 
 **Obiettivo:** osservare il comportamento di `MPI_Dims_create` su valori di `size` con fattorizzazioni diverse (numeri con molti fattori, come 12 o 16, rispetto a numeri primi, come 7 o 13, per i quali l'unica fattorizzazione bilanciata possibile in due fattori interi è banale, tipicamente `1×P`), comprendendo empiricamente il legame tra la fattorizzazione aritmetica di `size` e la "qualità" geometrica (rapporto tra i lati) della griglia risultante.
 
-## 9. Output atteso e come interpretarlo
+## 8. Output atteso e come interpretarlo
 
 ### ex1_cart_create (eseguito con `-np 6`, griglia 2×3)
 
@@ -306,7 +263,7 @@ Process 3 → coords(1,0) | N=0              S=MPI_PROC_NULL  W=MPI_PROC_NULL  E
 
 Con `size=6` e una griglia `dims={2,3}` (2 righe, 3 colonne, coerente con la convenzione row-major di sezione 3), i rank 0, 1, 2 occupano la riga 0 e i rank 3, 4, 5 la riga 1. Ogni processo della riga 0 ha correttamente `N=MPI_PROC_NULL` (nessun vicino a nord, essendo sulla prima riga e la griglia non periodica in questo esempio, `periods[0]=0`), mentre il rispettivo vicino a sud è il processo nella stessa colonna sulla riga 1 (ad esempio, per il processo 0 in `(0,0)`, il vicino sud è il processo 3 in `(1,0)`, coerente con la relazione `rank = coords[0]*dims[1] + coords[1]` di sezione 3: `1*3+0=3`). Analogamente, i processi in colonna 0 (P0, P3) hanno `W=MPI_PROC_NULL` e i processi in colonna 2 (P2, P5, non mostrato ma deducibile per simmetria) hanno `E=MPI_PROC_NULL`, coerentemente con l'assenza di periodicità anche sull'asse orizzontale. Si noti che ogni valore `S`/`N`/`E`/`W` diverso da `MPI_PROC_NULL` è simmetrico e reciproco tra coppie di processi adiacenti: il vicino sud di P0 è P3, e — come atteso — il vicino nord di P3 è P0, verificabile nella riga corrispondente dell'output.
 
-## 10. Errori comuni e come evitarli
+## 9. Errori comuni e come evitarli
 
 | Errore | Causa tipica | Come evitarlo |
 |---|---|---|
