@@ -116,7 +116,7 @@ Il vantaggio principale nell'affidarsi a queste librerie, invece di reimplementa
 
 ## 5. Fortran e C++ nell'HPC
 
-Fortran rimane, ancora oggi, uno dei linguaggi più rilevanti nel calcolo scientifico, per via della sua lunga storia (risale alla fine degli anni '50) e del vastissimo ecosistema di software numerico legacy scritto in questo linguaggio, ancora ampiamente utilizzato e mantenuto in molti codici di produzione HPC. Il C++ moderno raggiunge, in condizioni comparabili, prestazioni equivalenti a Fortran, offrendo in aggiunta meccanismi di astrazione (template, RAII, programmazione orientata agli oggetti) e strumenti di ingegneria del software (gestione della memoria automatizzata via RAII, sistema dei tipi più espressivo) generalmente più avanzati.
+Fortran rimane, ancora oggi, uno dei linguaggi più rilevanti nel calcolo scientifico, per via della sua lunga storia (risale alla fine degli anni '50) e del vastissimo ecosistema di software numerico legacy scritto in questo linguaggio, ancora ampiamente utilizzato e mantenuto in molti codici di produzione HPC. Il C++ moderno raggiunge, in condizioni comparabili, prestazioni equivalenti a Fortran, offrendo in aggiunta meccanismi di astrazione (template, programmazione orientata agli oggetti).
 
 ### 5.1 Ordinamento della memoria: row-major vs column-major
 
