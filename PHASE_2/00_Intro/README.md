@@ -226,9 +226,7 @@ int main(int argc, char* argv[])
 }
 ```
 
-`MPI_Init` deve essere invocata prima di qualunque altra funzione MPI (con la sola eccezione di un numero ristretto di funzioni di query esplicitamente definite dallo standard come utilizzabili anche prima dell'inizializzazione), e `MPI_Finalize` deve essere l'ultima chiamata MPI eseguita da ciascun processo prima della terminazione: questa struttura "a sandwich" (`MPI_Init` all'inizio, `MPI_Finalize` alla fine, tutta la logica applicativa MPI nel mezzo) è comune a **tutti** i programmi MPI presentati in questa repository, e non verrà ripetuta esplicitamente in ogni singolo capitolo successivo.
-
-MPI costituisce il fondamento della maggior parte delle applicazioni HPC su larga scala e rimane, a tutt'oggi, lo standard dominante per la programmazione parallela a memoria distribuita, adottato pressoché universalmente sui sistemi di calcolo ad alte prestazioni di livello mondiale (dai cluster dipartimentali ai sistemi exascale), spesso in combinazione con modelli di parallelismo a memoria condivisa a livello di singolo nodo (il cosiddetto modello ibrido MPI+OpenMP, o MPI+CUDA/HIP quando sono coinvolti acceleratori), non trattato in questa repository ma utile da conoscere come naturale estensione di quanto qui presentato.
+MPI costituisce il fondamento della maggior parte delle applicazioni HPC su larga scala e rimane, a tutt'oggi, lo standard dominante per la programmazione parallela a memoria distribuita, adottato pressoché universalmente sui sistemi di calcolo ad alte prestazioni di livello mondiale (dai cluster dipartimentali ai sistemi exascale), spesso in combinazione con modelli di parallelismo a memoria condivisa a livello di singolo nodo.
 
 ## 8. Roadmap della repository
 
@@ -247,7 +245,4 @@ Solutore di Jacobi Distribuito (03a)
       ↓
 Topologie Virtuali (03b)
 ```
-
-Non è presente alcun capitolo 4: la progressione didattica di questa repository si conclude con il capitolo 03b, e non comprende (in questa versione della repository) un modulo dedicato al benchmarking sistematico o all'analisi comparativa delle prestazioni tra linguaggi, argomento comunque introdotto concettualmente in questo capitolo (sezione 5) come base per un eventuale approfondimento autonomo.
-
-I capitoli finali (03a, 03b) combinano le primitive di comunicazione presentate nei capitoli precedenti (01a, 01b, 02) con un algoritmo numerico completo — il metodo iterativo di Jacobi — per mostrare un flusso di lavoro HPC realistico, basato su decomposizione del dominio e halo exchange, che costituisce il pattern di parallelizzazione più diffuso per la classe di algoritmi a stencil su griglia strutturata, ampiamente rappresentativa di una vasta gamma di solutori numerici per equazioni alle derivate parziali oltre al caso specifico del laplaciano trattato in questa repository.
+ parallelizzazione più diffuso per la classe di algoritmi a stencil su griglia strutturata, ampiamente rappresentativa di una vasta gamma di solutori numerici per equazioni alle derivate parziali oltre al caso specifico del laplaciano trattato in questa repository.
