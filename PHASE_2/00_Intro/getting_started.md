@@ -25,7 +25,7 @@
 #include <mpi.h>
 ```
 
-Questo è l'unico header necessario per accedere a tutte le funzioni MPI (`MPI_Init`, `MPI_Send`, `MPI_Bcast`, ecc.). Va incluso **prima** di qualunque chiamata MPI, e tipicamente è il primo include del file. Da un punto di vista tecnico, `mpi.h` è un header C (le implementazioni MPI espongono un'interfaccia C standard, non C++ nativa), motivo per cui alcune implementazioni lo racchiudono internamente in un blocco `extern "C" { ... }` quando incluso da un file C++, per garantire che il linker risolva correttamente i simboli con la convenzione di naming C (senza *name mangling*) usata dalla libreria MPI compilata. Questo dettaglio è gestito automaticamente dall'header stesso e non richiede alcuna azione esplicita da parte del programmatore, ma è utile saperlo per comprendere perché, ad esempio, non è possibile fare overloading di funzioni MPI in C++ nello stesso modo in cui si farebbe con funzioni dichiarate nativamente in C++.
+Questo è l'unico header necessario per accedere a tutte le funzioni MPI (`MPI_Init`, `MPI_Send`, `MPI_Bcast`, ecc.). Va incluso **prima** di qualunque chiamata MPI, e tipicamente è il primo include del file. Da un punto di vista tecnico, `mpi.h` è un header C (le implementazioni MPI espongono un'interfaccia C standard, non C++ nativa).
 
 ### Header standard C++ più comuni in ambito HPC
 
