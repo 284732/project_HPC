@@ -1,57 +1,58 @@
-# 📡 MPI in C++ for High Performance Computing
+# 📡 MPI in C++ per il Calcolo ad Alte Prestazioni
 
-## Overview
+## Panoramica
 
-This repository collects a set of progressively advanced examples and case studies on parallel programming with **MPI (Message Passing Interface)** in C++.
+Questa repository raccoglie una sequenza di esempi e casi di studio a difficoltà crescente sulla programmazione parallela con **MPI (Message Passing Interface)** in C++.
 
-The material covers the fundamental communication paradigms of distributed-memory systems, including point-to-point and collective communications, virtual topologies, domain decomposition techniques, and the implementation of an iterative Jacobi solver. Particular attention is devoted to concepts commonly encountered in High Performance Computing (HPC) applications such as halo exchange, synchronization, scalability, and performance analysis.
+Il materiale copre i paradigmi di comunicazione fondamentali dei sistemi a memoria distribuita, inclusa la comunicazione point-to-point (bloccante e non bloccante), la comunicazione collettiva, le topologie virtuali, le tecniche di decomposizione del dominio e l'implementazione di un solutore iterativo di Jacobi. Particolare attenzione è dedicata a concetti ricorrenti nelle applicazioni di High Performance Computing (HPC), quali halo exchange, sincronizzazione tra processi e scalabilità degli algoritmi distribuiti.
 
-The repository is organized as a sequence of thematic modules, each focusing on a specific aspect of MPI programming and accompanied by theoretical notes, commented source code, and representative execution outputs.
+La repository è organizzata come una sequenza di **capitoli** tematici, ciascuno dedicato a uno specifico aspetto della programmazione MPI, corredato di note teoriche, codice sorgente commentato e output di esecuzione rappresentativi.
 
 ---
 
-## 🗂️ Repository Structure
+## 🗂️ Struttura della repository
 
 ```text
 PHASE_2/
 │
-├── 00_Intro/                    ← Scientific Computing, HPC concepts and
-│                                  Fortran vs C++ considerations
+├── 00_Intro/                    ← Scientific Computing, concetti di HPC e
+│                                  considerazioni Fortran vs C++
 │
-├── 01_Point_to_Point/           ← Point-to-point communication
+├── 01_Point_to_Point/           ← Comunicazione point-to-point
 │   ├── Blocking/                ← MPI_Send / MPI_Recv
 │   └── NonBlocking/             ← MPI_Isend / MPI_Irecv
 │
-├── 02_Collective/               ← Collective communication primitives
+├── 02_Collective/               ← Primitive di comunicazione collettiva
 │
-├── 03_Topologies/
-│   ├── Virtual_Topologies/      ← Cartesian communicators and neighbor discovery
-│   └── Jacobi/                  ← Distributed Jacobi solver
-│
-└── 04_Benchmark/                ← Performance analysis and language comparison
+└── 03_Topologies/
+    ├── Jacobi/                  ← Solutore di Jacobi distribuito
+    └── Virtual_Topologies/      ← Comunicatori cartesiani e individuazione dei vicini
 ```
 
----
-
-## 📚 Contents
-
-| Module | Topic                                     | Main Concepts                                                      |
-| ------ | ----------------------------------------- | ------------------------------------------------------------------ |
-| 00     | Introduction                              | HPC fundamentals, Scientific Computing, Fortran vs C++             |
-| 01a    | Blocking Point-to-Point Communication     | MPI_Send, MPI_Recv, deadlock avoidance, ping-pong benchmark        |
-| 01b    | Non-Blocking Point-to-Point Communication | MPI_Isend, MPI_Irecv, MPI_Wait, MPI_Waitall, communication overlap |
-| 02     | Collective Communication                  | Broadcast, Scatter, Gather, Reduce, Allreduce, Alltoall            |
-| 03a    | Virtual Topologies                        | MPI_Cart_create, MPI_Cart_shift, MPI_Sendrecv, Cartesian grids     |
-| 03b    | Distributed Jacobi Solver                 | Domain decomposition, halo exchange, convergence detection         |
-| 04     | Benchmarking and Performance Analysis     | Scalability, speedup, efficiency, Fortran vs C++ discussion        |
+> ⚠️ **Nota sulla numerazione**: i capitoli 3a e 3b non seguono l'ordine alfabetico delle rispettive cartelle. Il capitolo **3a corrisponde al solutore di Jacobi** (cartella `Jacobi/`) e il capitolo **3b corrisponde alle topologie virtuali** (cartella `Virtual_Topologies/`), non viceversa. Questa numerazione riflette l'ordine didattico effettivo con cui i due argomenti vengono trattati, indipendentemente dall'ordine alfabetico delle cartelle sul filesystem.
 
 ---
 
-## ⚙️ Software Requirements
+## 📚 Indice dei capitoli
 
-### MPI Implementation
+| Capitolo | Argomento | Concetti principali |
+| --- | --- | --- |
+| 00 | Introduzione | Fondamenti di HPC, Scientific Computing, confronto Fortran vs C++ |
+| 01a | Comunicazione Point-to-Point Bloccante | MPI_Send, MPI_Recv, prevenzione del deadlock, benchmark ping-pong |
+| 01b | Comunicazione Point-to-Point Non Bloccante | MPI_Isend, MPI_Irecv, MPI_Wait, MPI_Waitall, sovrapposizione calcolo-comunicazione |
+| 02 | Comunicazione Collettiva | Bcast, Scatter, Gather, Reduce, Allreduce, Alltoall |
+| 03a | Solutore di Jacobi Distribuito | Decomposizione del dominio, halo exchange, criterio di convergenza |
+| 03b | Topologie Virtuali | MPI_Cart_create, MPI_Cart_shift, MPI_Sendrecv, griglie cartesiane |
 
-The examples can be compiled using either MPICH or OpenMPI.
+Non è presente alcun capitolo 4: la sequenza didattica della repository si conclude con il capitolo 3b.
+
+---
+
+## ⚙️ Requisiti software
+
+### Implementazione MPI
+
+Gli esempi possono essere compilati indifferentemente con MPICH oppure OpenMPI.
 
 ### Ubuntu / Debian
 
@@ -59,42 +60,44 @@ The examples can be compiled using either MPICH or OpenMPI.
 sudo apt install mpich build-essential
 ```
 
-or
+oppure
 
 ```bash
 sudo apt install libopenmpi-dev openmpi-bin
 ```
 
+Le due implementazioni sono entrambe conformi allo standard MPI e intercambiabili ai fini di questa repository; non è necessario installarle entrambe contemporaneamente, ed è sconsigliato mescolarle nello stesso ambiente di compilazione per evitare conflitti tra header e librerie di runtime.
+
 ---
 
-## Compilation
+## Compilazione
 
-Generic compilation template:
+Template generico di compilazione:
 
 ```bash
 mpicxx -O2 -Wall -o program program.cpp
 ```
 
-Execution example:
+Esempio di esecuzione:
 
 ```bash
 mpirun -np 4 ./program
 ```
 
-The `mpicxx` compiler wrapper automatically provides the required include paths and MPI libraries during compilation and linking.
+Il wrapper del compilatore `mpicxx` fornisce automaticamente, in fase di compilazione e di linking, i percorsi di include e le librerie MPI necessarie, evitando la necessità di specificarli manualmente. Il flag `-O2` abilita un livello di ottimizzazione moderato del compilatore (bilanciato tra tempo di compilazione e prestazioni del codice generato), mentre `-Wall` attiva l'insieme standard di warning del compilatore, utile in fase di sviluppo per individuare errori comuni (variabili non inizializzate, confronti sospetti, ecc.) prima ancora dell'esecuzione.
 
 ---
 
-## MPI Programming Model
+## Il modello di programmazione MPI
 
-MPI follows the **SPMD (Single Program Multiple Data)** paradigm:
+MPI segue il paradigma **SPMD (Single Program, Multiple Data)**:
 
-* A single executable is launched on multiple processes.
-* Each process owns a unique identifier called **rank**.
-* Processes cooperate by exchanging messages through MPI communication routines.
-* Every process executes the same source code while following different execution paths according to its rank.
+* Un singolo eseguibile viene lanciato su più processi.
+* Ogni processo possiede un identificatore univoco, il **rank**.
+* I processi cooperano scambiandosi messaggi tramite le routine di comunicazione MPI.
+* Ogni processo esegue lo stesso codice sorgente, ma segue percorsi di esecuzione diversi in base al proprio rank.
 
-Example:
+Esempio minimale:
 
 ```cpp
 #include <mpi.h>
@@ -118,84 +121,48 @@ int main(int argc, char* argv[])
 }
 ```
 
+Ogni programma MPI deve invocare `MPI_Init` prima di qualunque altra chiamata MPI (tipicamente come prima istruzione operativa di `main`, a valle della sola gestione di `argc`/`argv`) e `MPI_Finalize` come ultima chiamata MPI prima della terminazione del processo: nessuna funzione MPI, ad eccezione di un numero molto ristretto di query che lo standard esplicita separatamente, è definita al di fuori di questa finestra di inizializzazione/finalizzazione. Omettere `MPI_Finalize`, o invocare funzioni MPI dopo di essa, produce comportamento indefinito.
+
 ---
 
-## Common MPI Datatypes
+## Datatype MPI comuni
 
-| C++ Type  | MPI Datatype  |
-| --------- | ------------- |
-| int       | MPI_INT       |
-| double    | MPI_DOUBLE    |
-| float     | MPI_FLOAT     |
-| char      | MPI_CHAR      |
-| long      | MPI_LONG      |
+| Tipo C++ | Datatype MPI |
+| --- | --- |
+| int | MPI_INT |
+| double | MPI_DOUBLE |
+| float | MPI_FLOAT |
+| char | MPI_CHAR |
+| long | MPI_LONG |
 | long long | MPI_LONG_LONG |
 
+Questa tabella copre i tipi scalari più ricorrenti nei capitoli della repository; MPI definisce un insieme più ampio di datatype predefiniti (inclusi tipi senza segno, tipi composti come `MPI_DOUBLE_INT` per le operazioni `MPI_MAXLOC`/`MPI_MINLOC` discusse nel capitolo 02, e la possibilità di costruire datatype derivati custom per strutture dati non contigue), non trattati in questa tabella riassuntiva perché non necessari alla comprensione degli esempi base.
+
 ---
 
-## Educational Path
+## Percorso didattico
 
-The repository follows a progression from basic communication mechanisms to more advanced distributed algorithms:
+La repository segue una progressione dai meccanismi di comunicazione elementari agli algoritmi distribuiti più avanzati:
 
 ```text
-Introduction
+Introduzione (00)
       ↓
-Blocking Point-to-Point
+Point-to-Point Bloccante (01a)
       ↓
-Non-Blocking Point-to-Point
+Point-to-Point Non Bloccante (01b)
       ↓
-Collective Communication
+Comunicazione Collettiva (02)
       ↓
-Virtual Topologies
+Solutore di Jacobi Distribuito (03a)
       ↓
-Domain Decomposition
-      ↓
-Jacobi Solver
-      ↓
-Performance Analysis
+Topologie Virtuali (03b)
 ```
 
-Each module contains:
+Da notare che, in questa sequenza, il solutore di Jacobi (03a) precede didatticamente le topologie virtuali (03b): il capitolo 03a introduce la decomposizione del dominio e l'halo exchange usando calcoli manuali dei rank dei vicini (senza topologia cartesiana), mentre il capitolo 03b mostra successivamente come le stesse operazioni di individuazione dei vicini possano essere delegate a `MPI_Cart_shift`, generalizzando il pattern di decomposizione a griglie multidimensionali. Chi affronta i due capitoli in quest'ordine osserva quindi prima il problema (gestione manuale dei vicini in una decomposizione a strisce) e poi lo strumento che ne semplifica la soluzione in casi più generali (topologia cartesiana), anziché il percorso inverso.
 
-* Theoretical background
-* Commented C++ implementations
-* Representative execution examples
-* References to the relevant MPI concepts
+Ogni capitolo contiene:
 
----
-
-## Performance Analysis
-
-The final section includes benchmark-oriented material focused on:
-
-* Execution time measurements
-* Communication overhead evaluation
-* Strong scaling analysis
-* Speedup computation
-
-
-$$
-S(p) = \frac{T_1}{T_p}
-$$
-
-
-where (T_1) is the serial execution time and (T_p) is the execution time using (p) processes.
-
-Efficiency is computed as:
-
-$$
-E(p) = \frac{S(p)}{p}
-$$
-
-These metrics are applied to the distributed Jacobi solver to evaluate scalability.
-
----
-
-## References
-
-* MPI Forum, *MPI Standard 4.1*
-* William Gropp, Ewing Lusk, Anthony Skjellum, *Using MPI*
-* Peter Pacheco, *An Introduction to Parallel Programming*
-* Open MPI Documentation
-* MPICH Documentation
-* Intel oneAPI HPC Toolkit Documentation
+* Inquadramento teorico dell'argomento trattato
+* Implementazioni C++ commentate
+* Esempi di esecuzione rappresentativi, con output atteso commentato
+* Riferimenti ai concetti MPI rilevanti trattati nei capitoli precedenti, dove applicabile
