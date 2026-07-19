@@ -180,11 +180,10 @@ che dal linguaggio di programmazione scelto in sé. In condizioni di ottimizzazi
 I flag di ottimizzazione comunemente usati includono:
 
 ```bash
--O3 -march=native
+-O3 
 ```
 
 * **`-O3`** abilita il livello di ottimizzazione più aggressivo tra quelli standard offerti dal compilatore (superiore a `-O2`, usato invece come impostazione di riferimento più conservativa nei template di compilazione di questa repository, si vedano i capitoli successivi): include ottimizzazioni quali lo srotolamento automatico dei cicli (loop unrolling), l'inlining più aggressivo di funzioni, e — punto particolarmente rilevante per il codice numerico — un tentativo più esteso di vettorizzazione automatica dei cicli (auto-vectorization), trasformando cicli scalari in sequenze di istruzioni SIMD dove le dipendenze dati del codice lo consentono. `-O3`, in alcuni casi, può produrre codice più grande e, per pattern di codice non numerici, non garantisce sempre un miglioramento rispetto a `-O2`; per kernel numerici densi, tuttavia, è tipicamente la scelta preferita.
-* **`-march=native`** istruisce il compilatore a generare codice ottimizzato specificamente per il set di istruzioni della CPU su cui avviene la compilazione stessa (rilevato automaticamente), permettendo l'uso di estensioni vettoriali eventualmente disponibili (AVX2, AVX-512, a seconda della microarchitettura) che non sarebbero incluse in un binario generico portabile. Il costo di questa scelta è la **perdita di portabilità**: un eseguibile compilato con `-march=native` su una determinata macchina può non funzionare correttamente (in genere fallendo con un'istruzione illegale a runtime) se eseguito su un processore diverso, privo delle estensioni per cui il codice è stato specificamente generato. Su un cluster HPC eterogeneo, o quando il binario deve essere distribuito su hardware non noto a priori, si preferisce tipicamente specificare esplicitamente una microarchitettura target compatibile con tutti i nodi di destinazione, piuttosto che affidarsi a `-march=native`.
 
 In condizioni di ottimizzazione equivalenti, implementazioni moderne in Fortran e in C++ tendono quindi a mostrare prestazioni comparabili, come già osservato in sezione 5.2: la scelta dei flag di compilazione è, in pratica, un fattore di impatto prestazionale paragonabile alla scelta del linguaggio stesso, e va sempre documentata esplicitamente quando si riportano confronti di prestazioni tra implementazioni diverse di uno stesso algoritmo.
 
