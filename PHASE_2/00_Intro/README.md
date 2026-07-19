@@ -166,7 +166,7 @@ Questa considerazione non è puramente teorica nel contesto di questa repository
 
 ### 5.2 Prestazioni: linguaggio vs implementazione
 
-Per i kernel numerici, le prestazioni effettive sono determinate tipicamente più da:
+Per porzioni di codice che eseguono il calcolo matematico fondamentale di un algoritmo le prestazioni effettive sono determinate tipicamente più da:
 
 * **Qualità del compilatore** e della sua infrastruttura di ottimizzazione (entrambi i principali compilatori usati in ambito HPC, GCC e LLVM/Clang, così come i compilatori Fortran ad essi associati o compilatori proprietari come Intel oneAPI, condividono in larga parte le stesse tecniche di ottimizzazione a basso livello).
 * **Flag di ottimizzazione** scelti in fase di compilazione (sezione 6).
