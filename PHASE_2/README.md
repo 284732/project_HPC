@@ -40,8 +40,6 @@ PHASE_2/
 | 03a | Solutore di Jacobi Distribuito | Decomposizione del dominio, halo exchange, criterio di convergenza |
 | 03b | Topologie Virtuali | MPI_Cart_create, MPI_Cart_shift, MPI_Sendrecv, griglie cartesiane |
 
-Non è presente alcun capitolo 4: la sequenza didattica della repository si conclude con il capitolo 3b.
-
 ---
 
 ## ⚙️ Requisiti software
