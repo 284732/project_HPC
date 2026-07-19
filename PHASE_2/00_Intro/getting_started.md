@@ -106,7 +106,7 @@ sudo apt install libopenmpi-dev openmpi-bin
 sudo apt install mpich
 ```
 
-> Le due implementazioni principali sono **OpenMPI** e **MPICH**. Per gli esercizi di questo tutorial sono intercambiabili, poiché entrambe implementano fedelmente lo standard MPI e la sintassi del codice C++ presentato non dipende da alcuna estensione specifica dell'una o dell'altra. Su cluster HPC, si utilizza tipicamente l'implementazione già disponibile e configurata dagli amministratori di sistema (spesso Intel MPI, o una build di OpenMPI/MPICH specificamente compilata per sfruttare l'interconnessione di rete del cluster, es. Infiniband).
+> Le due implementazioni principali sono **OpenMPI** e **MPICH**. Per gli esercizi successivi sono intercambiabili, poiché entrambe implementano fedelmente lo standard MPI e la sintassi del codice C++ presentato non dipende da alcuna estensione specifica dell'una o dell'altra.
 
 ## 3. Esecuzione con `mpirun`
 
