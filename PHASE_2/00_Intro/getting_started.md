@@ -133,9 +133,9 @@ Vale la pena chiarire la distinzione tra `mpirun`/`mpiexec` e `srun`: nei primi 
 MPI_Init(&argc, &argv);
 ```
 
-**Deve essere la prima chiamata MPI** del programma. Inizializza l'ambiente di esecuzione MPI e rende disponibili tutti i meccanismi di comunicazione: prima di questa chiamata, nessuna funzione MPI è utilizzabile (con la sola eccezione di `MPI_Initialized`, una funzione di query pensata specificamente per verificare, in codice riutilizzabile o in librerie che potrebbero essere invocate sia in contesti MPI che non-MPI, se l'ambiente MPI è già stato inizializzato altrove).
+**Deve essere la prima chiamata MPI** del programma. Inizializza l'ambiente di esecuzione MPI e rende disponibili tutti i meccanismi di comunicazione: prima di questa chiamata, nessuna funzione MPI è utilizzabile .
 
-`argc` e `argv` vengono passati da `main` per puntatore perché alcune implementazioni MPI utilizzano gli argomenti da riga di comando per configurazioni interne (ad esempio parametri specifici del launcher, filtrati e rimossi dagli argomenti prima che il programma applicativo li veda), e `MPI_Init` può quindi modificarne il contenuto. È buona pratica passare sempre `argc`/`argv` a `MPI_Init` anche quando il programma applicativo non necessita di argomenti da riga di comando propri, per garantire la piena compatibilità con questo comportamento specifico dell'implementazione. Esiste inoltre una variante `MPI_Init_thread`, non trattata in questo tutorial, che permette di richiedere esplicitamente un determinato livello di supporto al multithreading (rilevante in scenari ibridi MPI+thread, ad esempio MPI combinato con OpenMP), assente nella forma base di `MPI_Init` qui presentata.
+`argc` e `argv` vengono passati da `main` per puntatore perché alcune implementazioni MPI utilizzano gli argomenti da riga di comando per configurazioni interne (ad esempio parametri specifici del launcher, filtrati e rimossi dagli argomenti prima che il programma applicativo li veda), e `MPI_Init` può quindi modificarne il contenuto. È buona pratica passare sempre `argc`/`argv` a `MPI_Init` anche quando il programma applicativo non necessita di argomenti da riga di comando propri, per garantire la piena compatibilità con questo comportamento specifico dell'implementazione.
 
 ### `MPI_Finalize` — Terminazione
 
@@ -153,7 +153,7 @@ MPI_Finalize();
 MPI_COMM_WORLD
 ```
 
-Questo è il **communicator predefinito** che include tutti i processi lanciati da `mpirun`. Un communicator è un gruppo di processi che possono comunicare tra loro (concetto approfondito nel capitolo 01a, sezione 2.3). `MPI_COMM_WORLD` è sempre disponibile immediatamente dopo `MPI_Init` e contiene, per definizione, ogni processo del job MPI corrente: è la scelta di default per la quasi totalità delle comunicazioni presentate in questo tutorial, salvo nei casi in cui si costruiscono esplicitamente sotto-communicator (come nel caso di `MPI_Cart_sub`, capitolo 03b, sezione 6).
+Questo è il **communicator predefinito** che include tutti i processi lanciati da `mpirun`. Un communicator è un gruppo di processi che possono comunicare tra loro (concetto approfondito nel capitolo 01a, sezione 2.3). `MPI_COMM_WORLD` è sempre disponibile immediatamente dopo `MPI_Init` e contiene, per definizione, ogni processo del job MPI corrente: è la scelta di default per la quasi totalità delle comunicazioni presentate negli esercizi successivi della repo.
 
 ### `MPI_Comm_rank` — Chi sono io?
 
@@ -162,7 +162,7 @@ int rank;
 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 ```
 
-Assegna a `rank` l'**identificatore univoco** del processo corrente all'interno del communicator specificato. I rank vanno da `0` a `size-1`. Il rank è il meccanismo con cui ogni processo determina la propria identità e decide il proprio comportamento (ad esempio `if (rank == 0)` per distinguere il processo master, un pattern ricorrente in ogni capitolo di questo tutorial).
+Assegna a `rank` l'**identificatore univoco** del processo corrente all'interno del communicator specificato. I rank vanno da `0` a `size-1`. Il rank è il meccanismo con cui ogni processo determina la propria identità e decide il proprio comportamento (ad esempio `if (rank == 0)` per distinguere il processo master, un pattern ricorrente nella repo di questo tutorial).
 
 ### `MPI_Comm_size` — Quanti siamo?
 
@@ -171,8 +171,7 @@ int size;
 MPI_Comm_size(MPI_COMM_WORLD, &size);
 ```
 
-Assegna a `size` il **numero totale di processi** presenti nel communicator specificato. Questo valore corrisponde esattamente a quello passato a `mpirun -np` (o a `-n`, `--ntasks`, a seconda del launcher usato, sezione 3), per il communicator `MPI_COMM_WORLD`; per un sotto-communicator ottenuto ad esempio tramite `MPI_Cart_sub`, `size` restituirebbe invece il numero di processi appartenenti a quello specifico sotto-gruppo, tipicamente inferiore al numero totale di processi del job.
-
+Assegna a `size` il **numero totale di processi** presenti nel communicator specificato. Questo valore corrisponde esattamente a quello passato a `mpirun -np` (o a `-n`, `--ntasks`, a seconda del launcher usato, sezione 3), per il communicator `MPI_COMM_WORLD`.
 ## 5. Differenze sintattiche: Fortran `call` vs chiamate dirette in C++
 
 Chi proviene da MPI in Fortran incontrerà immediatamente tre differenze sintattiche sistematiche in ogni programma MPI scritto in C++.
@@ -209,7 +208,7 @@ In C++, il codice di errore è invece il **valore di ritorno** della funzione st
 int err = MPI_Send(buf, count, MPI_DOUBLE, dest, tag, MPI_COMM_WORLD);
 ```
 
-In pratica, nel codice di questo tutorial il valore di ritorno viene spesso ignorato (nessuna delle due varianti, `int err = ...` o la chiamata "nuda" senza assegnazione, altera il comportamento della chiamata stessa), ma può e dovrebbe essere controllato esplicitamente in codice di produzione, tipicamente confrontandolo con la costante `MPI_SUCCESS`. Il comportamento di default di MPI, in assenza di un error handler personalizzato installato esplicitamente tramite `MPI_Comm_set_errhandler` (non trattato in questo tutorial), è comunque quello di terminare il programma con un messaggio diagnostico alla prima condizione di errore rilevata, rendendo il controllo esplicito del valore di ritorno una misura di robustezza aggiuntiva più che strettamente necessaria per la correttezza degli esercizi qui presentati.
+In pratica, nel codice di questo tutorial il valore di ritorno viene spesso ignorato (nessuna delle due varianti, `int err = ...` o la chiamata "nuda" senza assegnazione, altera il comportamento della chiamata stessa), ma può e dovrebbe essere controllato esplicitamente, tipicamente confrontandolo con la costante `MPI_SUCCESS`. Il comportamento di default di MPI, in assenza di un error handler personalizzato installato esplicitamente tramite `MPI_Comm_set_errhandler` (non trattato successivamente nella repo), è comunque quello di terminare il programma con un messaggio diagnostico alla prima condizione di errore rilevata, rendendo il controllo esplicito del valore di ritorno una misura di robustezza aggiuntiva più che strettamente necessaria per la correttezza degli esercizi qui presentati.
 
 ### Puntatori per gli argomenti di output
 
@@ -260,7 +259,7 @@ MPI_Send(v.data(), 100, MPI_DOUBLE, dest, tag, MPI_COMM_WORLD);
 
 ## 6. Struttura minima di ogni programma MPI
 
-Questo è il template di partenza da cui derivano tutti gli esercizi del tutorial:
+Questo è il template di partenza da cui derivano tutti gli esercizi successivi:
 
 ```cpp
 #include <mpi.h>
@@ -355,11 +354,11 @@ double buf = 0.0;
 MPI_Recv(&buf, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 ```
 
-Va chiarito il motivo tecnico di questa raccomandazione: `MPI_Recv` sovrascriverà comunque interamente `buf` con il contenuto del messaggio ricevuto (assumendo che la ricezione vada a buon fine), quindi il valore iniziale di `buf` non influenza mai il *risultato* dell'operazione di ricezione in sé. L'inizializzazione esplicita è però una misura di robustezza difensiva rilevante in scenari più complessi: in fase di debug (per distinguere a colpo d'occhio, in un dump di memoria o in un debugger, un buffer effettivamente popolato da MPI da uno mai toccato per un bug nel matching sender/receiver), e soprattutto in scenari in cui la ricezione potrebbe fallire silenziosamente o non completarsi per un errore logico altrove nel programma (ad esempio un mismatch di tag o rank, guida 01a, sezione 12): un buffer inizializzato a un valore noto e riconoscibile (es. `0.0`, o un valore sentinella chiaramente anomalo per il dominio applicativo) rende molto più agevole diagnosticare, a posteriori, se quella particolare ricezione sia effettivamente avvenuta come previsto.
+Va chiarito il motivo tecnico di questa raccomandazione: `MPI_Recv` sovrascriverà comunque interamente `buf` con il contenuto del messaggio ricevuto (assumendo che la ricezione vada a buon fine), quindi il valore iniziale di `buf` non influenza mai il *risultato* dell'operazione di ricezione in sé. L'inizializzazione esplicita è però una misura di robustezza difensiva rilevante in scenari più complessi: in fase di debug (per distinguere a colpo d'occhio, in un dump di memoria o in un debugger, un buffer effettivamente popolato da MPI da uno mai toccato per un bug nel matching sender/receiver), e soprattutto in scenari in cui la ricezione potrebbe fallire silenziosamente o non completarsi per un errore logico altrove nel programma (ad esempio un mismatch di tag o rank, capitolo 01a, sezione 12): un buffer inizializzato a un valore noto e riconoscibile (es. `0.0`, o un valore sentinella chiaramente anomalo per il dominio applicativo) rende molto più agevole diagnosticare, a posteriori, se quella particolare ricezione sia effettivamente avvenuta come previsto.
 
-## 8. Collegamento con il resto del tutorial
+## 8. Collegamento con il resto della repo
 
-Una volta chiara questa struttura di base, ogni esercizio del tutorial segue lo stesso pattern generale: `MPI_Init` → logica differenziata per rank → `MPI_Finalize`. Ciò che cambia, capitolo dopo capitolo, è esclusivamente la **logica di comunicazione** inserita nel mezzo:
+Una volta chiara questa struttura di base, ogni esercizio segue lo stesso pattern generale: `MPI_Init` → logica differenziata per rank → `MPI_Finalize`. Ciò che cambia, capitolo dopo capitolo, è esclusivamente la **logica di comunicazione** inserita nel mezzo:
 
 ```text
 getting_started.md        ←  sei qui
@@ -375,4 +374,4 @@ getting_started.md        ←  sei qui
    └── Virtual_Topologies/    ←  capitolo 03b — griglie cartesiane virtuali
 ```
 
-Questo documento, insieme al capitolo 00, costituisce quindi il prerequisito comune a tutti i capitoli successivi: da qui in avanti, ogni nuovo capitolo introdurrà esclusivamente le funzioni MPI specifiche del pattern di comunicazione trattato, dando per acquisita la struttura generale (`Init`/`Finalize`, gestione del rank, compilazione con `mpicxx`, esecuzione con `mpirun`) presentata in questo documento.
+Questo documento, insieme al readme del capitolo 00_intro, costituisce quindi il prerequisito comune a tutti i capitoli successivi: da qui in avanti, ogni nuovo capitolo introdurrà esclusivamente le funzioni MPI specifiche del pattern di comunicazione trattato, dando per acquisita la struttura generale (`Init`/`Finalize`, gestione del rank, compilazione con `mpicxx`, esecuzione con `mpirun`) presentata in questo documento.
