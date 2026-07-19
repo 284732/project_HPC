@@ -91,7 +91,6 @@ mpicxx -O2 -Wall -std=c++14 -o program program.cpp
 | `-O3 -march=native` | Ottimizzazione massima, incluse istruzioni specifiche della CPU corrente (si veda capitolo 00, sezione 6, per la spiegazione dettagliata del significato e dei rischi di portabilità di `-march=native`) |
 | `-Wall` | Abilita l'insieme standard di warning del compilatore — da usare sempre, poiché individua a tempo di compilazione una classe ampia di errori comuni (variabili non inizializzate, confronti sospetti tra tipi diversi, funzioni con valore di ritorno non gestito) prima ancora dell'esecuzione |
 | `-std=c++14` | Seleziona lo standard C++14 (minimo raccomandato per i futuri esercizi nella repo; usare `-std=c++17` se disponibile sul sistema, per accedere a funzionalità del linguaggio più recenti) |
-| `-g` | Include i simboli di debug nel binario compilato, necessari per poter ispezionare il programma con `gdb` (o con `mpirun` in combinazione con `gdb`, tipicamente lanciando ciascun processo MPI sotto un'istanza separata del debugger, o usando strumenti di debug paralleli dedicati come TotalView o DDT su cluster di produzione) |
 
 Da notare che `-Wall`, pur abilitando un ampio insieme di warning utili, non è esaustivo: per un controllo ancora più stringente in fase di sviluppo si aggiunge spesso anche `-Wextra`, non incluso di default in questo tutorial per mantenere l'output di compilazione più leggibile durante l'apprendimento iniziale.
 
