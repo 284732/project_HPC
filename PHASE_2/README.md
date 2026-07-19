@@ -29,10 +29,6 @@ PHASE_2/
     └── Virtual_Topologies/      ← Comunicatori cartesiani e individuazione dei vicini
 ```
 
-> ⚠️ **Nota sulla numerazione**: i capitoli 3a e 3b non seguono l'ordine alfabetico delle rispettive cartelle. Il capitolo **3a corrisponde al solutore di Jacobi** (cartella `Jacobi/`) e il capitolo **3b corrisponde alle topologie virtuali** (cartella `Virtual_Topologies/`), non viceversa. Questa numerazione riflette l'ordine didattico effettivo con cui i due argomenti vengono trattati, indipendentemente dall'ordine alfabetico delle cartelle sul filesystem.
-
----
-
 ## 📚 Indice dei capitoli
 
 | Capitolo | Argomento | Concetti principali |
