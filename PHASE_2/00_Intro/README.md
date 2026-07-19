@@ -1,55 +1,71 @@
-# 00 — Introduction: C++ for High Performance Computing
+# 00 — Introduzione: C++ per il Calcolo ad Alte Prestazioni
 
-## Motivation
-
-High Performance Computing (HPC) applications require the efficient use of modern hardware resources, including multicore CPUs, vector units, accelerators, and distributed-memory clusters.
-
-Among the programming languages commonly adopted in scientific computing, C++ occupies a central role thanks to its combination of:
-
-* High execution performance
-* Direct control over memory management
-* Compatibility with established numerical libraries
-* Native support for parallel programming models
-* Scalability from small applications to large scientific codes
-
-This directory focuses on distributed-memory parallel programming using MPI and provides a collection of examples implemented entirely in modern C++.
+> Capitolo introduttivo della repository. Non presuppone conoscenza pregressa di MPI (introdotto a partire dal capitolo 01a), ma presuppone familiarità di base con C++ (tipi, funzioni, template a un livello elementare) e con i concetti generali di architettura dei calcolatori (memoria, cache, CPU).
 
 ---
 
-## Why C++ for Scientific Computing?
+## Indice
 
-Scientific applications are often characterized by:
-
-* Large numerical datasets
-* Intensive floating-point computations
-* Strict memory requirements
-* Long execution times
-
-To address these challenges, HPC software relies on languages capable of producing highly optimized machine code.
-
-Modern C++ provides:
-
-* Compile-time optimization
-* Automatic vectorization
-* Fine-grained memory control
-* Generic programming through templates
-* Access to optimized numerical libraries
-
-As a result, C++ is widely used in computational physics, computational fluid dynamics, finite element analysis, machine learning infrastructures, and large-scale simulation frameworks.
+1. [Motivazione e contesto](#1-motivazione-e-contesto)
+2. [Perché C++ per il calcolo scientifico](#2-perché-c-per-il-calcolo-scientifico)
+3. [Organizzazione della memoria e array numerici](#3-organizzazione-della-memoria-e-array-numerici)
+4. [Librerie numeriche](#4-librerie-numeriche)
+5. [Fortran e C++ nell'HPC](#5-fortran-e-c-nellhpc)
+6. [Ottimizzazione a livello di compilatore](#6-ottimizzazione-a-livello-di-compilatore)
+7. [MPI e parallelismo a memoria distribuita](#7-mpi-e-parallelismo-a-memoria-distribuita)
+8. [Roadmap della repository](#8-roadmap-della-repository)
 
 ---
 
-## Memory Layout and Numerical Arrays
+## 1. Motivazione e contesto
 
-Efficient memory access is one of the key factors affecting performance.
+Le applicazioni di **High Performance Computing (HPC)** richiedono l'uso efficiente delle risorse hardware disponibili sui sistemi di calcolo moderni: CPU multicore, unità di calcolo vettoriale (SIMD), acceleratori (GPU, e più in generale dispositivi con architetture massicciamente parallele), e cluster a memoria distribuita composti da centinaia o migliaia di nodi di calcolo interconnessi da reti ad alta velocità e bassa latenza (Infiniband, reti proprietarie a toro o dragonfly, ecc.).
 
-A contiguous memory layout improves:
+Il termine "alte prestazioni" non va inteso in senso vago: nel contesto HPC si riferisce tipicamente alla capacità di un'applicazione di **scalare**, ossia di ridurre il proprio tempo di esecuzione (o di aumentare la dimensione del problema trattabile a parità di tempo) in modo proporzionale, o il più possibile vicino a proporzionale, all'aumentare delle risorse di calcolo impiegate. Questa proprietà — la scalabilità — è l'obiettivo di fondo che guida gran parte delle scelte progettuali discusse in questa repository, dalla scelta del linguaggio di programmazione fino ai pattern di comunicazione MPI trattati nei capitoli successivi.
 
-* Cache utilization
-* Memory bandwidth efficiency
-* SIMD vectorization opportunities
+Raggiungere buone prestazioni e buona scalabilità richiede attenzione simultanea a più livelli, tra loro interdipendenti:
 
-Example using `std::vector`:
+* **Livello algoritmico**: la complessità computazionale e di comunicazione dell'algoritmo scelto (ad esempio, come discusso nel capitolo 03a, la scelta tra un pattern di comunicazione P2P mirato e uno collettivo dipende dalla struttura delle dipendenze dati dell'algoritmo).
+* **Livello di implementazione**: come il codice sorgente sfrutta (o non sfrutta) le caratteristiche del linguaggio e delle librerie disponibili per produrre codice macchina efficiente.
+* **Livello hardware**: come i dati vengono disposti in memoria e acceduti, in modo da sfruttare la gerarchia di cache, l'ampiezza di banda della memoria e le unità di calcolo vettoriale del processore.
+* **Livello di sistema distribuito**: come i processi cooperano e si scambiano dati attraverso la rete di interconnessione, argomento centrale di tutti i capitoli successivi di questa repository.
+
+Questo capitolo introduttivo si concentra sui primi tre livelli, fornendo il contesto necessario a comprendere **perché** certe scelte implementative (contiguità della memoria, scelta del linguaggio, uso di librerie ottimizzate) sono rilevanti prima ancora di introdurre la comunicazione distribuita.
+
+## 2. Perché C++ per il calcolo scientifico
+
+Le applicazioni scientifiche sono tipicamente caratterizzate da:
+
+* Grandi insiemi di dati numerici, spesso array multidimensionali di dimensione dell'ordine di milioni o miliardi di elementi.
+* Calcoli intensivi in virgola mobile (floating-point), spesso ripetuti un numero elevatissimo di volte all'interno di cicli iterativi (come, ad esempio, le iterazioni del metodo di Jacobi discusso nel capitolo 03a).
+* Vincoli di memoria stringenti, dato che la dimensione dei problemi trattabili è spesso limitata dalla memoria RAM disponibile per processo/nodo, non solo dal tempo di calcolo.
+* Tempi di esecuzione lunghi (ore o giorni, anche su cluster di grandi dimensioni), che rendono ogni inefficienza percentuale nel codice moltiplicata per un costo assoluto significativo in termini di tempo macchina e consumo energetico.
+
+Per affrontare questi vincoli, il software HPC si affida a linguaggi capaci di produrre codice macchina fortemente ottimizzato, con overhead di runtime minimo o nullo rispetto a un'implementazione equivalente scritta direttamente in linguaggio macchina. Il C++ moderno (a partire dallo standard C++11 e successivi) offre, in questo senso, un insieme di caratteristiche particolarmente rilevanti:
+
+* **Ottimizzazione a tempo di compilazione.** Il compilatore C++ dispone di informazioni complete sui tipi e sulla struttura del programma già in fase di compilazione, permettendo ottimizzazioni aggressive (inlining di funzioni, eliminazione di codice morto, propagazione di costanti, srotolamento di cicli) senza alcun overhead a runtime, a differenza di linguaggi con risoluzione dinamica dei tipi o compilazione just-in-time.
+* **Vettorizzazione automatica.** Il compilatore può trasformare automaticamente cicli che operano su dati contigui in istruzioni SIMD (Single Instruction, Multiple Data — vedi sezione 3), che eseguono la stessa operazione aritmetica simultaneamente su più elementi di dato in un singolo ciclo di clock, a patto che il codice sorgente non introduca ostacoli alla vettorizzazione (dipendenze tra iterazioni, accessi a memoria non contigui, aliasing di puntatori non dichiarato).
+* **Controllo granulare della memoria.** A differenza di linguaggi con garbage collector, C++ consente al programmatore di controllare esplicitamente quando e come la memoria viene allocata, disposta e rilasciata (tramite RAII — Resource Acquisition Is Initialization — e contenitori come `std::vector`), evitando pause di garbage collection non deterministiche che sarebbero inaccettabili in codice numerico ad alte prestazioni con vincoli di tempo predicibili.
+* **Programmazione generica tramite template.** I template C++ permettono di scrivere codice numerico generico rispetto al tipo di dato (`float`, `double`, tipi custom per precisione estesa) **senza** pagare il costo di indirezione a runtime tipico del polimorfismo dinamico (`virtual`): la risoluzione avviene interamente a tempo di compilazione, principio spesso riassunto con l'espressione "zero-cost abstraction" (astrazione a costo nullo): l'uso di un'astrazione di alto livello, se usata correttamente, non introduce overhead misurabile rispetto al codice scritto manualmente senza quell'astrazione.
+* **Accesso a librerie numeriche ottimizzate.** Come discusso in dettaglio nella sezione 4, l'ecosistema C++ include binding diretti o wrapper header-only per le principali librerie di algebra lineare e calcolo numerico usate in ambito HPC.
+
+Grazie a questa combinazione di caratteristiche, il C++ è ampiamente utilizzato in fisica computazionale, fluidodinamica computazionale (CFD), analisi agli elementi finiti (FEM), infrastrutture di machine learning ad alte prestazioni, e framework di simulazione su larga scala.
+
+## 3. Organizzazione della memoria e array numerici
+
+L'efficienza di accesso alla memoria è uno dei fattori più determinanti per le prestazioni di un programma numerico, spesso più rilevante della sola complessità algoritmica asintotica quando si opera su hardware reale.
+
+### 3.1 Gerarchia di memoria e cache
+
+I processori moderni non accedono alla RAM principale direttamente per ogni operazione: interpongono una gerarchia di memorie cache (tipicamente L1, L2, L3), progressivamente più capienti ma più lente man mano che ci si allontana dal core di calcolo. Quando un dato viene acceduto, l'intera **cache line** che lo contiene (tipicamente 64 byte sui processori x86_64 attuali, corrispondenti a 8 valori `double` consecutivi) viene caricata in cache, non il singolo valore richiesto. Questo comportamento ha una conseguenza diretta e fondamentale per il codice numerico: **accedere a dati disposti in modo contiguo in memoria, nello stesso ordine in cui sono fisicamente disposti, massimizza il riutilizzo di ciò che è già stato caricato in cache**, riducendo drasticamente il numero di accessi alla RAM principale (che, in termini di cicli di clock, è uno o due ordini di grandezza più lenta della cache L1).
+
+Un layout di memoria **contiguo** migliora quindi, simultaneamente:
+
+* **L'utilizzo della cache**: più accessi successivi trovano il dato già disponibile in cache (cache hit) invece di dover attendere il caricamento da RAM (cache miss).
+* **L'efficienza della banda di memoria**: il trasferimento di blocchi contigui satura più efficacemente la banda disponibile tra RAM e processore rispetto a trasferimenti sparsi (gather/scatter), che richiedono transazioni di memoria separate e non pienamente utilizzate.
+* **Le opportunità di vettorizzazione SIMD**: le istruzioni SIMD (ad esempio i set di istruzioni AVX2/AVX-512 sui processori Intel/AMD) operano nativamente su blocchi di dati contigui allineati in memoria; dati sparsi richiedono istruzioni di raccolta (gather) più costose, quando supportate, o impediscono del tutto la vettorizzazione automatica da parte del compilatore.
+
+### 3.2 Contenitori contigui in C++: `std::vector` e array grezzi
 
 ```cpp
 #include <vector>
@@ -57,36 +73,32 @@ Example using `std::vector`:
 std::vector<double> x = {1.0, 2.0, 3.0};
 ```
 
-The elements are stored contiguously in memory, making the structure suitable for numerical kernels and MPI communications.
+`std::vector<T>` garantisce, per specifica dello standard C++, che i propri elementi siano memorizzati in un **blocco di memoria contiguo**, esattamente come un array C tradizionale: `&x[0]`, `&x[1]`, `&x[2]` sono indirizzi consecutivi (a meno del padding introdotto dall'allineamento del tipo `T`, non rilevante per `double`). Questo è il motivo per cui `std::vector` è la struttura dati di riferimento per kernel numerici e comunicazioni MPI: un puntatore al primo elemento (`x.data()`, oppure `&x[0]`) e la dimensione (`x.size()`) sono sufficienti per interfacciarsi sia con librerie numeriche C-style sia con le routine di comunicazione MPI, che operano su buffer contigui identificati da un puntatore di base e un conteggio di elementi (esattamente i parametri `buf`/`count` visti nei prototipi di `MPI_Send`, `MPI_Bcast`, ecc. nei capitoli successivi).
 
-Raw arrays are also frequently used:
+Gli array grezzi sono altrettanto frequentemente usati, con proprietà di contiguità identiche:
 
 ```cpp
 double x[3] = {1.0, 2.0, 3.0};
 ```
 
-Both representations can be passed directly to MPI communication routines.
+Entrambe le rappresentazioni possono essere passate direttamente alle routine di comunicazione MPI, poiché MPI opera a livello di indirizzi di memoria grezzi (`void*`) e non ha nozione del tipo C++ del contenitore usato per allocare quella memoria: ciò che conta, ai fini di MPI, è che il buffer sia effettivamente contiguo e che il `datatype`/`count` dichiarati nella chiamata MPI corrispondano fedelmente al layout reale dei dati.
 
----
+## 4. Librerie numeriche
 
-## Numerical Libraries
+Le applicazioni scientifiche moderne raramente reimplementano da zero algoritmi numerici fondamentali: si affidano invece a librerie estremamente ottimizzate, spesso sviluppate e affinate nel corso di decenni, con implementazioni specifiche per l'architettura hardware target.
 
-Modern scientific applications rarely implement numerical algorithms from scratch.
+| Libreria | Scopo | Note tecniche |
+| --- | --- | --- |
+| **BLAS** (Basic Linear Algebra Subprograms) | Operazioni di algebra lineare di base | Organizzata in tre "livelli": Livello 1 (operazioni vettore-vettore, es. prodotto scalare), Livello 2 (operazioni matrice-vettore), Livello 3 (operazioni matrice-matrice, con la maggiore intensità aritmetica e quindi il maggior potenziale di ottimizzazione). Esistono implementazioni altamente ottimizzate per hardware specifico (OpenBLAS, Intel MKL, ATLAS) |
+| **LAPACK** (Linear Algebra PACKage) | Algebra lineare densa (fattorizzazioni, autovalori, sistemi lineari) | Costruita sopra le primitive BLAS; fornisce routine per fattorizzazione LU, Cholesky, QR, decomposizione a autovalori/autovettori, SVD |
+| **ScaLAPACK** (Scalable LAPACK) | Algebra lineare densa distribuita | Estensione di LAPACK a memoria distribuita tramite MPI; le matrici sono partizionate tra i processi secondo uno schema di distribuzione a blocchi ciclici (block-cyclic distribution), pensato per bilanciare il carico computazionale tra i processi anche per algoritmi con pattern di accesso non uniforme (es. eliminazione gaussiana con pivoting) |
+| **FFTW** (Fastest Fourier Transform in the West) | Trasformata di Fourier veloce (FFT) | Include varianti parallele a memoria distribuita basate su MPI, che tipicamente richiedono una ridistribuzione dei dati tra processi tramite pattern di comunicazione all-to-all, concettualmente analogo a `MPI_Alltoall` (capitolo 02, sezione 7) |
+| **PETSc** (Portable, Extensible Toolkit for Scientific Computation) | Framework per il calcolo scientifico distribuito | Fornisce strutture dati distribuite per matrici sparse e vettori, e solutori per sistemi lineari e non lineari (inclusi metodi iterativi di tipo Krylov, precondizionatori), con un'astrazione della comunicazione MPI sottostante |
+| **Trilinos** | Framework per la simulazione numerica | Ecosistema modulare di pacchetti per algebra lineare distribuita, solutori, discretizzazioni e ottimizzazione, con obiettivi in parte sovrapponibili a PETSc, sviluppato principalmente presso i Sandia National Laboratories |
+| **Eigen** | Libreria di algebra lineare C++ header-only | Non richiede compilazione/linking separato (l'intera libreria è distribuita come header C++ template); sfrutta espressioni template (expression templates) per fondere automaticamente operazioni concatenate (es. `A*B + C`) in un singolo ciclo di calcolo, evitando l'allocazione di risultati temporanei intermedi |
+| **Armadillo** | Libreria di algebra lineare C++ ad alto livello | Sintassi ispirata a MATLAB/Octave, pensata per favorire la rapidità di prototipazione mantenendo prestazioni competitive tramite delega, ove disponibile, a BLAS/LAPACK sottostanti |
 
-Instead, they rely on highly optimized libraries such as:
-
-| Library   | Purpose                                |
-| --------- | -------------------------------------- |
-| BLAS      | Basic linear algebra operations        |
-| LAPACK    | Dense linear algebra                   |
-| ScaLAPACK | Distributed linear algebra             |
-| FFTW      | Fast Fourier Transform                 |
-| PETSc     | Scientific computing framework         |
-| Trilinos  | Numerical simulation framework         |
-| Eigen     | Header-only C++ linear algebra library |
-| Armadillo | High-level linear algebra library      |
-
-Example using Eigen:
+Esempio d'uso di Eigen, per il calcolo degli autovalori di una matrice 2×2:
 
 ```cpp
 #include <Eigen/Dense>
@@ -101,76 +113,94 @@ Eigen::EigenSolver<Eigen::Matrix2d> solver(A);
 auto eigenvalues = solver.eigenvalues();
 ```
 
-These libraries provide performance comparable to hand-written implementations while significantly reducing development effort.
+Il vantaggio principale nell'affidarsi a queste librerie, invece di reimplementare gli algoritmi corrispondenti, è duplice: da un lato le implementazioni sono tipicamente ottimizzate a un livello (blocking per la cache, vettorizzazione manuale, tuning specifico per microarchitettura) difficilmente replicabile in tempi di sviluppo ragionevoli da un singolo progetto applicativo; dall'altro, la correttezza numerica di questi algoritmi (in particolare la loro stabilità numerica rispetto a errori di arrotondamento in virgola mobile) è stata validata estensivamente nel corso di decenni di uso in produzione, un livello di affidabilità difficile da raggiungere per un'implementazione scritta da zero.
 
----
+## 5. Fortran e C++ nell'HPC
 
-## Fortran and C++ in HPC
+Fortran rimane, ancora oggi, uno dei linguaggi più rilevanti nel calcolo scientifico, per via della sua lunga storia (risale alla fine degli anni '50) e del vastissimo ecosistema di software numerico legacy scritto in questo linguaggio, ancora ampiamente utilizzato e mantenuto in molti codici di produzione HPC. Il C++ moderno raggiunge, in condizioni comparabili, prestazioni equivalenti a Fortran, offrendo in aggiunta meccanismi di astrazione (template, RAII, programmazione orientata agli oggetti) e strumenti di ingegneria del software (gestione della memoria automatizzata via RAII, sistema dei tipi più espressivo) generalmente più avanzati.
 
-Fortran remains one of the most important languages in scientific computing due to its long history and extensive ecosystem of numerical software.
+### 5.1 Ordinamento della memoria: row-major vs column-major
 
-Modern C++, however, achieves comparable performance while offering additional abstraction mechanisms and software engineering tools.
+Una differenza tecnica rilevante, e fonte comune di bug prestazionali silenziosi quando si porta codice da un linguaggio all'altro, riguarda l'ordine di memorizzazione degli array multidimensionali:
 
-### Memory Ordering
-
-A notable difference concerns multidimensional arrays:
-
-| Language | Memory Layout |
-| -------- | ------------- |
-| Fortran  | Column-major  |
-| C/C++    | Row-major     |
-
-Fortran:
+| Linguaggio | Layout di memoria |
+| --- | --- |
+| Fortran | Column-major (per colonne) |
+| C/C++ | Row-major (per righe) |
 
 ```fortran
 real :: A(100,100)
 A(i,j)
 ```
 
-C++:
-
 ```cpp
 double A[100][100];
 A[i][j];
 ```
 
-Understanding memory ordering is important because traversal patterns directly influence cache efficiency.
+In un array bidimensionale **row-major** (C/C++), gli elementi di una stessa riga sono contigui in memoria: `A[i][j]` e `A[i][j+1]` differiscono di un solo elemento in indirizzo, mentre `A[i][j]` e `A[i+1][j]` differiscono di un'intera riga (100 elementi, nell'esempio sopra). In un array bidimensionale **column-major** (Fortran), vale l'esatto opposto: sono gli elementi di una stessa colonna a essere contigui, quindi `A(i,j)` e `A(i+1,j)` differiscono di un solo elemento, mentre `A(i,j)` e `A(i,j+1)` differiscono di un'intera colonna.
 
-### Performance
+Questa differenza non è un dettaglio puramente accademico: determina direttamente quale **ordine di attraversamento** (nesting dei cicli) di un array multidimensionale produce accessi contigui alla memoria, e quindi buone prestazioni di cache, e quale ordine produce invece accessi con **stride** elevato (salti di memoria di dimensione pari a un'intera riga/colonna ad ogni iterazione del ciclo interno), penalizzando fortemente le prestazioni per via del conseguente aumento dei cache miss:
 
-For numerical kernels, performance is typically determined more by:
+```cpp
+// C/C++, row-major: il ciclo INTERNO deve scorrere sull'ULTIMO indice
+// per ottenere accessi contigui in memoria
+for (int i = 0; i < N; i++)
+    for (int j = 0; j < N; j++)
+        A[i][j] = ...;   // accesso contiguo: j varia più velocemente,
+                          // coerente con il layout row-major
+```
 
-* Compiler quality
-* Optimization flags
-* Memory access patterns
-* Vectorization
+```fortran
+! Fortran, column-major: il ciclo INTERNO deve scorrere sul PRIMO indice
+do j = 1, N
+  do i = 1, N
+    A(i,j) = ...   ! accesso contiguo: i varia più velocemente,
+                    ! coerente con il layout column-major
+  end do
+end do
+```
 
-than by the language itself.
+Invertire l'ordine di nesting rispetto alla convenzione del linguaggio (ad esempio, in C++, iterare sull'indice di riga `i` nel ciclo più interno) produce codice **funzionalmente corretto** ma con un pattern di accesso a stride elevato, che in generale degrada sensibilmente le prestazioni, tanto più quanto la dimensione dell'array eccede la capacità delle cache più veloci: ogni accesso rischia di richiedere il caricamento di una nuova cache line, invece di riutilizzare quella già caricata dall'accesso precedente. Questo effetto è tipicamente osservabile e misurabile già per matrici di dimensione moderata (centinaia di elementi per lato), e diventa via via più marcato al crescere della dimensione del problema.
 
-Common optimization flags include:
+Questa considerazione non è puramente teorica nel contesto di questa repository: nel capitolo 03a (solutore di Jacobi), lo stencil a 5 punti applicato a una griglia bidimensionale accede sistematicamente ai quattro vicini cardinali di ogni nodo; la scelta di quale dimensione della griglia decomporre tra i processi (righe, come nella decomposizione a strisce presentata in quel capitolo, oppure colonne) e l'ordine con cui i cicli di aggiornamento locale vengono annidati nel codice C++ hanno un impatto diretto sulle prestazioni del kernel di calcolo locale, indipendentemente dal costo della comunicazione MPI associata.
+
+### 5.2 Prestazioni: linguaggio vs implementazione
+
+Per i kernel numerici, le prestazioni effettive sono determinate tipicamente più da:
+
+* **Qualità del compilatore** e della sua infrastruttura di ottimizzazione (entrambi i principali compilatori usati in ambito HPC, GCC e LLVM/Clang, così come i compilatori Fortran ad essi associati o compilatori proprietari come Intel oneAPI, condividono in larga parte le stesse tecniche di ottimizzazione a basso livello).
+* **Flag di ottimizzazione** scelti in fase di compilazione (sezione 6).
+* **Pattern di accesso alla memoria** del codice sorgente (sezione 3 e 5.1).
+* **Vettorizzazione**, automatica o assistita, del ciclo di calcolo.
+
+che dal linguaggio di programmazione scelto in sé. In condizioni di ottimizzazione equivalenti (stessi flag, stesso pattern di accesso alla memoria, stesso livello di vettorizzazione ottenuto), implementazioni moderne in Fortran e in C++ tendono a mostrare prestazioni comparabili per la stessa classe di kernel numerici, poiché entrambi vengono compilati verso codice macchina dallo stesso tipo di infrastruttura di ottimizzazione del compilatore. Le differenze prestazionali osservate in pratica tra le due implementazioni di uno stesso algoritmo sono quindi, nella grande maggioranza dei casi, riconducibili a differenze nel pattern di accesso alla memoria effettivamente scritto dal programmatore (coerente o meno con il layout nativo del linguaggio, sezione 5.1) piuttosto che a limiti intrinseci dell'uno o dell'altro linguaggio.
+
+## 6. Ottimizzazione a livello di compilatore
+
+I flag di ottimizzazione comunemente usati includono:
 
 ```bash
 -O3 -march=native
 ```
 
-Under equivalent optimization conditions, modern Fortran and C++ implementations often exhibit comparable performance.
+* **`-O3`** abilita il livello di ottimizzazione più aggressivo tra quelli standard offerti dal compilatore (superiore a `-O2`, usato invece come impostazione di riferimento più conservativa nei template di compilazione di questa repository, si vedano i capitoli successivi): include ottimizzazioni quali lo srotolamento automatico dei cicli (loop unrolling), l'inlining più aggressivo di funzioni, e — punto particolarmente rilevante per il codice numerico — un tentativo più esteso di vettorizzazione automatica dei cicli (auto-vectorization), trasformando cicli scalari in sequenze di istruzioni SIMD dove le dipendenze dati del codice lo consentono. `-O3`, in alcuni casi, può produrre codice più grande e, per pattern di codice non numerici, non garantisce sempre un miglioramento rispetto a `-O2`; per kernel numerici densi, tuttavia, è tipicamente la scelta preferita.
+* **`-march=native`** istruisce il compilatore a generare codice ottimizzato specificamente per il set di istruzioni della CPU su cui avviene la compilazione stessa (rilevato automaticamente), permettendo l'uso di estensioni vettoriali eventualmente disponibili (AVX2, AVX-512, a seconda della microarchitettura) che non sarebbero incluse in un binario generico portabile. Il costo di questa scelta è la **perdita di portabilità**: un eseguibile compilato con `-march=native` su una determinata macchina può non funzionare correttamente (in genere fallendo con un'istruzione illegale a runtime) se eseguito su un processore diverso, privo delle estensioni per cui il codice è stato specificamente generato. Su un cluster HPC eterogeneo, o quando il binario deve essere distribuito su hardware non noto a priori, si preferisce tipicamente specificare esplicitamente una microarchitettura target compatibile con tutti i nodi di destinazione, piuttosto che affidarsi a `-march=native`.
 
----
+In condizioni di ottimizzazione equivalenti, implementazioni moderne in Fortran e in C++ tendono quindi a mostrare prestazioni comparabili, come già osservato in sezione 5.2: la scelta dei flag di compilazione è, in pratica, un fattore di impatto prestazionale paragonabile alla scelta del linguaggio stesso, e va sempre documentata esplicitamente quando si riportano confronti di prestazioni tra implementazioni diverse di uno stesso algoritmo.
 
-## MPI and Distributed-Memory Parallelism
+## 7. MPI e parallelismo a memoria distribuita
 
-While shared-memory parallelism relies on threads, MPI enables communication between independent processes, potentially distributed across multiple nodes of a cluster.
+Mentre il parallelismo a memoria condivisa (ad esempio tramite thread, con modelli come OpenMP) si basa su unità di esecuzione che condividono lo stesso spazio di indirizzamento e possono quindi accedere direttamente alle stesse variabili in memoria, **MPI** abilita la comunicazione tra processi **indipendenti**, ciascuno con il proprio spazio di memoria privato, potenzialmente distribuiti su nodi fisicamente separati di un cluster e privi di qualunque meccanismo di accesso diretto alla memoria altrui.
 
-The MPI execution model is based on:
+Il modello di esecuzione MPI si fonda su:
 
-* Multiple processes
-* Explicit message passing
-* Distributed memory
-* SPMD (Single Program Multiple Data)
+* **Processi multipli**, ciascuno un'istanza a sé stante del programma, con la propria memoria, il proprio stack e le proprie variabili locali.
+* **Scambio esplicito di messaggi** come unico meccanismo di comunicazione tra processi: nessun dato è condiviso implicitamente, ogni trasferimento di informazione deve essere codificato esplicitamente dal programmatore tramite una chiamata a una routine di comunicazione MPI (argomento centrale di tutti i capitoli successivi).
+* **Memoria distribuita**: la somma della memoria disponibile a tutti i processi di un job MPI può eccedere quella di un singolo nodo fisico, permettendo di affrontare problemi la cui dimensione dei dati eccede la RAM disponibile su una singola macchina — motivazione pratica primaria per l'adozione di MPI in molte applicazioni HPC, oltre alla parallelizzazione del tempo di calcolo.
+* **SPMD (Single Program, Multiple Data)**: un singolo eseguibile viene lanciato ripetutamente come processi distinti, ciascuno operante su una porzione diversa dei dati complessivi del problema, secondo il modello già descritto nel file indice della repository.
 
-Every process executes the same source code while operating on different portions of the data.
-
-Example:
+Ogni processo esegue lo stesso codice sorgente, ma opera su porzioni diverse dei dati, tipicamente distinguendo il proprio comportamento tramite il proprio **rank** (l'identificatore intero univoco assegnato a ciascun processo all'interno di un communicator, concetto approfondito a partire dal capitolo 01a):
 
 ```cpp
 #include <mpi.h>
@@ -198,33 +228,28 @@ int main(int argc, char* argv[])
 }
 ```
 
-MPI forms the foundation of most large-scale HPC applications and remains the dominant standard for distributed-memory parallel programming.
+`MPI_Init` deve essere invocata prima di qualunque altra funzione MPI (con la sola eccezione di un numero ristretto di funzioni di query esplicitamente definite dallo standard come utilizzabili anche prima dell'inizializzazione), e `MPI_Finalize` deve essere l'ultima chiamata MPI eseguita da ciascun processo prima della terminazione: questa struttura "a sandwich" (`MPI_Init` all'inizio, `MPI_Finalize` alla fine, tutta la logica applicativa MPI nel mezzo) è comune a **tutti** i programmi MPI presentati in questa repository, e non verrà ripetuta esplicitamente in ogni singolo capitolo successivo.
 
----
+MPI costituisce il fondamento della maggior parte delle applicazioni HPC su larga scala e rimane, a tutt'oggi, lo standard dominante per la programmazione parallela a memoria distribuita, adottato pressoché universalmente sui sistemi di calcolo ad alte prestazioni di livello mondiale (dai cluster dipartimentali ai sistemi exascale), spesso in combinazione con modelli di parallelismo a memoria condivisa a livello di singolo nodo (il cosiddetto modello ibrido MPI+OpenMP, o MPI+CUDA/HIP quando sono coinvolti acceleratori), non trattato in questa repository ma utile da conoscere come naturale estensione di quanto qui presentato.
 
-## Repository Roadmap
+## 8. Roadmap della repository
 
-The material is organized according to increasing levels of complexity:
+Il materiale è organizzato secondo livelli di complessità crescente:
 
 ```text
-Introduction
+Introduzione (00)
       ↓
-Blocking Point-to-Point Communication
+Comunicazione Point-to-Point Bloccante (01a)
       ↓
-Non-Blocking Point-to-Point Communication
+Comunicazione Point-to-Point Non Bloccante (01b)
       ↓
-Collective Communication
+Comunicazione Collettiva (02)
       ↓
-Virtual Topologies
+Solutore di Jacobi Distribuito (03a)
       ↓
-Domain Decomposition
-      ↓
-Distributed Jacobi Solver
-      ↓
-Performance Analysis
+Topologie Virtuali (03b)
 ```
 
-The final modules combine communication primitives and numerical algorithms to demonstrate realistic HPC workflows based on domain decomposition and iterative solvers.
+Non è presente alcun capitolo 4: la progressione didattica di questa repository si conclude con il capitolo 03b, e non comprende (in questa versione della repository) un modulo dedicato al benchmarking sistematico o all'analisi comparativa delle prestazioni tra linguaggi, argomento comunque introdotto concettualmente in questo capitolo (sezione 5) come base per un eventuale approfondimento autonomo.
 
----
-
+I capitoli finali (03a, 03b) combinano le primitive di comunicazione presentate nei capitoli precedenti (01a, 01b, 02) con un algoritmo numerico completo — il metodo iterativo di Jacobi — per mostrare un flusso di lavoro HPC realistico, basato su decomposizione del dominio e halo exchange, che costituisce il pattern di parallelizzazione più diffuso per la classe di algoritmi a stencil su griglia strutturata, ampiamente rappresentativa di una vasta gamma di solutori numerici per equazioni alle derivate parziali oltre al caso specifico del laplaciano trattato in questa repository.
