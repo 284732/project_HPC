@@ -39,7 +39,7 @@ Questo è l'unico header necessario per accedere a tutte le funzioni MPI (`MPI_I
 #include <cstring>    // std::memcpy, strlen — operazioni su buffer grezzi
 ```
 
-Alcune note su header ricorrenti in questo tutorial: `<cmath>` è necessario ogniqualvolta si utilizzano funzioni matematiche standard (ad esempio `std::fabs` per il calcolo delle variazioni puntuali nel solutore di Jacobi, capitolo 03a); `<algorithm>` fornisce `std::swap`, usato sistematicamente nel solutore di Jacobi per scambiare i puntatori dei buffer `u`/`u_new` senza copia (capitolo 03a, sezione 2.7); `<cstring>` è utile quando si opera su buffer di memoria grezzi in scenari di ottimizzazione avanzata, meno frequente negli esercizi introduttivi ma presente in codice HPC di produzione.
+Alcune note su header ricorrenti in questo tutorial: `<cmath>` è necessario ogniqualvolta si utilizzano funzioni matematiche standard (ad esempio `std::fabs` per il calcolo delle variazioni puntuali nel solutore di Jacobi, capitolo 03a); `<algorithm>` fornisce `std::swap`, usato sistematicamente nel solutore di Jacobi per scambiare i puntatori dei buffer `u`/`u_new` senza copia (capitolo 03a, sezione 2.7).
 
 ### Ordine di include consigliato
 
