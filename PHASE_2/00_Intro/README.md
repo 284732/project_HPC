@@ -1,6 +1,6 @@
 # 00 — Introduzione: C++ per il Calcolo ad Alte Prestazioni
 
-> Capitolo introduttivo della repository. Non presuppone conoscenza pregressa di MPI (introdotto a partire dal capitolo 01a), ma presuppone familiarità di base con C++ (tipi, funzioni, template a un livello elementare) e con i concetti generali di architettura dei calcolatori (memoria, cache, CPU).
+> Capitolo introduttivo della repository.
 
 ---
 
