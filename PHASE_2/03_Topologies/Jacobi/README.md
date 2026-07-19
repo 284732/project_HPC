@@ -1,6 +1,6 @@
 # 03b — Solutore di Jacobi in MPI
 
-> Guida di riferimento sul metodo iterativo di Jacobi applicato in ambiente a memoria distribuita. Presuppone la lettura delle guide precedenti (01a/01b — comunicazione point-to-point, 03 — comunicazione collettiva): qui `MPI_Allreduce` e `MPI_Allgather` vengono riutilizzate senza essere ridefinite da zero, mentre `MPI_Sendrecv` viene introdotta ex novo, essendo la prima occorrenza in questa serie di guide.
+> Capitolo di riferimento sul metodo iterativo di Jacobi applicato in ambiente a memoria distribuita. Presuppone la lettura dei capitoli precedenti (01a/01b — comunicazione point-to-point, 02 — comunicazione collettiva): qui `MPI_Allreduce` e `MPI_Allgather` vengono riutilizzate senza essere ridefinite da zero, mentre `MPI_Sendrecv` viene introdotta ex novo, essendo la prima occorrenza.
 >
 > Questo modulo presenta due applicazioni del metodo di Jacobi strutturalmente distinte: la prima applica il metodo alla soluzione numerica di un'equazione differenziale alle derivate parziali (PDE) tramite discretizzazione su griglia, con parallelizzazione **spaziale** del dominio; la seconda applica lo stesso metodo a un sistema lineare denso di piccola dimensione, con parallelizzazione **algebrica** a livello delle singole incognite. Il confronto tra le due strategie di parallelizzazione è l'obiettivo didattico-ingegneristico centrale di questa guida.
 
