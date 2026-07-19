@@ -1,6 +1,6 @@
-# 03a — Topologie Virtuali in MPI (Griglia Cartesiana)
+# 03b — Topologie Virtuali in MPI (Griglia Cartesiana)
 
-> Capitolo di riferimento sulle topologie virtuali cartesiane in MPI. Presuppone la lettura dei capitoli precedenti (01a/01b — comunicazione point-to-point, 02 — comunicazione collettiva, 03b — solutore di Jacobi, dove `MPI_Sendrecv` e il concetto di halo exchange sono già stati introdotti in dettaglio). Qui `MPI_Sendrecv` viene riutilizzata senza essere ridefinita.
+> Capitolo di riferimento sulle topologie virtuali cartesiane in MPI. Presuppone la lettura dei capitoli precedenti (01a/01b — comunicazione point-to-point, 02 — comunicazione collettiva, 03a — solutore di Jacobi, dove `MPI_Sendrecv` e il concetto di halo exchange sono già stati introdotti in dettaglio). Qui `MPI_Sendrecv` viene riutilizzata senza essere ridefinita.
 
 ---
 
