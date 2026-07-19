@@ -62,7 +62,6 @@ Un layout di memoria **contiguo** migliora quindi, simultaneamente:
 
 * **L'utilizzo della cache**: più accessi successivi trovano il dato già disponibile in cache (cache hit) invece di dover attendere il caricamento da RAM (cache miss).
 * **L'efficienza della banda di memoria**: il trasferimento di blocchi contigui satura più efficacemente la banda disponibile tra RAM e processore rispetto a trasferimenti sparsi (gather/scatter), che richiedono transazioni di memoria separate e non pienamente utilizzate.
-* **Le opportunità di vettorizzazione SIMD**: le istruzioni SIMD (ad esempio i set di istruzioni AVX2/AVX-512 sui processori Intel/AMD) operano nativamente su blocchi di dati contigui allineati in memoria; dati sparsi richiedono istruzioni di raccolta (gather) più costose, quando supportate, o impediscono del tutto la vettorizzazione automatica da parte del compilatore.
 
 ### 3.2 Contenitori contigui in C++: `std::vector` e array grezzi
 
