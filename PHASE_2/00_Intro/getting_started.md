@@ -378,11 +378,9 @@ is the **communication logic** in between:
 ```
 getting_started.md   ←  you are here
         ↓
-01_point_to_point/   ←  MPI_Send / MPI_Recv between two processes
+01_point_to_point/   ←  MPI_Send / MPI_Recv (blocking and non-blocking) between two processes
         ↓
-02_communicators/    ←  subgroups and custom communicators
+02_collective/       ←  Bcast, Scatter, Gather, Reduce across all processes
         ↓
-03_collective/       ←  Bcast, Scatter, Gather, Reduce across all processes
-        ↓
-04_topologies/       ←  virtual grids and 2D Jacobi solver
+03_topologies/       ←  virtual grids and 2D Jacobi solver
 ```
