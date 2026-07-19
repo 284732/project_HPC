@@ -237,7 +237,7 @@ Alcune strategie standard:
    MPI_Recv(&a, 1, MPI_INT, 1, 0, ...);  MPI_Send(&b, 1, MPI_INT, 0, 0, ...);
    ```
 
-2. **Usare `MPI_Sendrecv`**, una funzione che combina invio e ricezione in un'unica chiamata gestita internamente da MPI in modo sicuro (non soggetta a questo tipo di deadlock).
+2. **Usare `MPI_Sendrecv`**, una funzione che combina invio e ricezione in un'unica chiamata gestita internamente da MPI in modo sicuro (non soggetta a questo tipo di deadlock), spiegata in modo esaustivo nel capitolo 3b.
 
 3. **Usare comunicazioni non bloccanti** (`MPI_Isend`/`MPI_Irecv`), argomento del capitolo successivo.
 
