@@ -92,8 +92,6 @@ mpicxx -O2 -Wall -std=c++14 -o program program.cpp
 | `-Wall` | Abilita l'insieme standard di warning del compilatore — da usare sempre, poiché individua a tempo di compilazione una classe ampia di errori comuni (variabili non inizializzate, confronti sospetti tra tipi diversi, funzioni con valore di ritorno non gestito) prima ancora dell'esecuzione |
 | `-std=c++14` | Seleziona lo standard C++14 (minimo raccomandato per i futuri esercizi nella repo; usare `-std=c++17` se disponibile sul sistema, per accedere a funzionalità del linguaggio più recenti) |
 
-Da notare che `-Wall`, pur abilitando un ampio insieme di warning utili, non è esaustivo: per un controllo ancora più stringente in fase di sviluppo si aggiunge spesso anche `-Wextra`, non incluso di default in questo tutorial per mantenere l'output di compilazione più leggibile durante l'apprendimento iniziale.
-
 ### Verificare la propria installazione MPI
 
 ```bash
