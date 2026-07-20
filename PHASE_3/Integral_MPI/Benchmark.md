@@ -230,7 +230,7 @@ In the following table are reported tha evolution of the values of **efficiency*
 
 - At low task counts (2–4), the Monte Carlo version scales better (99.8%–99% efficiency) than the quadrature version (94.5%–83.9%), since the latter's interleaved sampling and per-point step scaling add more per-process bookkeeping.
 - At 8 tasks both methods lose efficiency (89.5% for Monte Carlo, 77.6% for quadrature), but the drop is sharper for quadrature, reflecting its comparatively heavier communication and barrier synchronization pattern.
-- The quadrature results show an anomaly at 16 tasks, jumping back up to 95% efficiency after the 8-task dip, unlike Monte Carlo which keeps declining smoothly to 78.5% — likely due to problem-size or system-level effects rather than a genuine scaling improvement.
+- The quadrature results show an anomaly at 16 tasks, jumping back up to 95% efficiency after the 8-task dip, unlike Monte Carlo which keeps declining smoothly to 78.5%, likely due to problem-size or system-level effects rather than a genuine scaling improvement.
 - Overall, Monte Carlo's embarrassingly parallel structure yields more predictable, monotonically decreasing efficiency, while quadrature's non-monotonic trend suggests its scaling behavior is less stable across process counts.
 
 
