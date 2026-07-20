@@ -1,265 +1,266 @@
-# Per Iniziare — Struttura di un Programma MPI in C++
+# Getting Started — Structure of an MPI Program in C++
 
-> Questo documento è il punto di partenza pratico prima di affrontare qualunque capitolo di questo tutorial. Precede concettualmente il capitolo 00 (introduzione teorica al C++ per l'HPC): mentre quel capitolo motiva le scelte di linguaggio e le caratteristiche prestazionali rilevanti, questo documento copre gli aspetti puramente operativi — ambiente, header, compilazione, esecuzione — necessari a mandare in esecuzione anche il più semplice dei programmi MPI presentati nei capitoli successivi.
-
----
-
-## Indice
-
-1. [Header necessari](#1-header-necessari)
-2. [Compilatori](#2-compilatori)
-3. [Esecuzione con mpirun](#3-esecuzione-con-mpirun)
-4. [Concetti fondamentali di MPI](#4-concetti-fondamentali-di-mpi)
-5. [Differenze sintattiche: Fortran `call` vs chiamate dirette in C++](#5-differenze-sintattiche-fortran-call-vs-chiamate-dirette-in-c)
-6. [Struttura minima di ogni programma MPI](#6-struttura-minima-di-ogni-programma-mpi)
-7. [Errori comuni da evitare](#7-errori-comuni-da-evitare)
-8. [Collegamento con il resto del tutorial](#8-collegamento-con-il-resto-del-tutorial)
+> This document is the practical starting point before tackling any chapter of this tutorial. It conceptually precedes chapter 00 (theoretical introduction to C++ for HPC): while that chapter motivates the language choices and the relevant performance characteristics, this document covers the purely operational aspects — environment, headers, compilation, execution — needed to get even the simplest of the MPI programs presented in later chapters up and running.
 
 ---
 
-## 1. Header necessari
+## Table of Contents
 
-### Per MPI
+1. [Required headers](#1-required-headers)
+2. [Compilers](#2-compilers)
+3. [Running with mpirun](#3-running-with-mpirun)
+4. [Core MPI concepts](#4-core-mpi-concepts)
+5. [Syntactic differences: Fortran `call` vs direct calls in C++](#5-syntactic-differences-fortran-call-vs-direct-calls-in-c)
+6. [Minimal structure of every MPI program](#6-minimal-structure-of-every-mpi-program)
+7. [Common mistakes to avoid](#7-common-mistakes-to-avoid)
+8. [Connection to the rest of the tutorial](#8-connection-to-the-rest-of-the-tutorial)
+
+---
+
+## 1. Required headers
+
+### For MPI
 
 ```cpp
 #include <mpi.h>
 ```
 
-Questo è l'unico header necessario per accedere a tutte le funzioni MPI (`MPI_Init`, `MPI_Send`, `MPI_Bcast`, ecc.). Va incluso **prima** di qualunque chiamata MPI, e tipicamente è il primo include del file. Da un punto di vista tecnico, `mpi.h` è un header C (le implementazioni MPI espongono un'interfaccia C standard, non C++ nativa).
+This is the only header needed to access all MPI functions (`MPI_Init`, `MPI_Send`, `MPI_Bcast`, etc.). It must be included **before** any MPI call, and is typically the first include in the file. From a technical standpoint, `mpi.h` is a C header (MPI implementations expose a standard C interface, not a native C++ one).
 
-### Header standard C++ più comuni in ambito HPC
+### Most common C++ standard headers in HPC
 
 ```cpp
 #include <iostream>   // std::cout, std::cerr
-#include <vector>     // std::vector<T> — array dinamici contigui (capitolo 00, sezione 3.2)
+#include <vector>     // std::vector<T> — contiguous dynamic arrays (chapter 00, section 3.2)
 #include <cmath>      // std::sqrt, std::abs, M_PI
-#include <iomanip>    // std::setprecision, std::setw — formattazione dell'output
+#include <iomanip>    // std::setprecision, std::setw — output formatting
 #include <algorithm>  // std::max, std::min, std::swap
 #include <numeric>    // std::iota, std::accumulate
-#include <cstring>    // std::memcpy, strlen — operazioni su buffer grezzi
+#include <cstring>    // std::memcpy, strlen — raw buffer operations
 ```
 
-Alcune note su header ricorrenti in questo tutorial: `<cmath>` è necessario ogniqualvolta si utilizzano funzioni matematiche standard (ad esempio `std::fabs` per il calcolo delle variazioni puntuali nel solutore di Jacobi, capitolo 03a); `<algorithm>` fornisce `std::swap`, usato sistematicamente nel solutore di Jacobi per scambiare i puntatori dei buffer `u`/`u_new` senza copia (capitolo 03a, sezione 2.7).
+A few notes on headers that recur throughout this tutorial: `<cmath>` is needed whenever standard math functions are used (for example `std::fabs` to compute pointwise variations in the Jacobi solver, chapter 03a); `<algorithm>` provides `std::swap`, used systematically in the Jacobi solver to swap the `u`/`u_new` buffer pointers without copying (chapter 03a, section 2.7).
 
-### Ordine di include consigliato
+### Recommended include order
 
-Per chiarezza e portabilità, è buona norma seguire sempre questo ordine:
+For clarity and portability, it is good practice to always follow this order:
 
 ```cpp
-// 1. Header MPI (sempre per primo, se si usa MPI)
+// 1. MPI header (always first, if MPI is used)
 #include <mpi.h>
 
-// 2. Header della libreria standard C++
+// 2. C++ standard library headers
 #include <iostream>
 #include <vector>
 #include <cmath>
 
-// 3. Librerie di terze parti, se necessarie (Eigen, ecc. — vedi capitolo 00, sezione 4)
+// 3. Third-party libraries, if needed (Eigen, etc. — see chapter 00, section 4)
 // #include <Eigen/Dense>
 
-// 4. Header locali del progetto
+// 4. Local project headers
 // #include "utils.h"
 ```
 
-Questo ordinamento non è puramente stilistico: includere `mpi.h` per primo riduce il rischio di conflitti di macro o di ridefinizione di simboli con altre librerie che potrebbero, a loro volta, includere internamente header di sistema in un ordine diverso da quello atteso dall'implementazione MPI in uso.
+This ordering is not purely stylistic: including `mpi.h` first reduces the risk of macro conflicts or symbol redefinition with other libraries that might, in turn, internally include system headers in an order different from the one expected by the MPI implementation in use.
 
-## 2. Compilatori
+## 2. Compilers
 
-### Il compilatore diretto: `g++`
+### The direct compiler: `g++`
 
-`g++` è il compilatore C++ del progetto GCC. Non ha alcuna conoscenza nativa di MPI: per compilare un programma che usa MPI con `g++` direttamente, sarebbe necessario specificare manualmente tutti i percorsi di include e di linking della libreria MPI installata sul sistema:
+`g++` is the C++ compiler from the GCC project. It has no native knowledge of MPI: to compile a program that uses MPI with `g++` directly, one would need to manually specify all the include and linking paths of the MPI library installed on the system:
 
 ```bash
-# NON fare così manualmente:
+# Do NOT do this manually:
 g++ -I/usr/include/mpi -L/usr/lib/x86_64-linux-gnu/openmpi/lib \
     -lmpi -o program program.cpp
 ```
 
-Questo approccio è fragile: i percorsi esatti degli header e delle librerie MPI variano a seconda della distribuzione Linux, dell'implementazione MPI installata (OpenMPI, MPICH, Intel MPI, ecc.) e della versione specifica, rendendo il comando sopra non portabile tra sistemi diversi.
+This approach is fragile: the exact paths of MPI headers and libraries vary depending on the Linux distribution, the installed MPI implementation (OpenMPI, MPICH, Intel MPI, etc.), and the specific version, making the command above non-portable across different systems.
 
-### Il wrapper consigliato: `mpicxx`
+### The recommended wrapper: `mpicxx`
 
-`mpicxx` (talvolta disponibile anche come `mpic++`, a seconda dell'implementazione) è un **wrapper** attorno a `g++` (o al compilatore C++ di sistema configurato dall'implementazione MPI, che può anche essere Clang o un compilatore proprietario) che aggiunge automaticamente tutti i flag di include e di linking necessari per MPI, interrogando la configurazione dell'implementazione MPI installata al momento della sua stessa compilazione/installazione. Questo è il modo corretto di compilare programmi MPI, indipendentemente dal sistema su cui si sta lavorando:
+`mpicxx` (sometimes also available as `mpic++`, depending on the implementation) is a **wrapper** around `g++` (or the system C++ compiler configured by the MPI implementation, which may also be Clang or a proprietary compiler) that automatically adds all the include and linking flags needed for MPI, by querying the configuration of the MPI implementation installed at the time it was itself compiled/installed. This is the correct way to compile MPI programs, regardless of the system being worked on:
 
 ```bash
 mpicxx -O2 -Wall -std=c++14 -o program program.cpp
 ```
 
-| Flag | Significato |
+| Flag | Meaning |
 | --- | --- |
-| `-O2` | Livello di ottimizzazione 2 (buon compromesso tra velocità di esecuzione e facilità di debug; è il livello usato come riferimento nei template di compilazione di questo tutorial) |
-| `-O3 -march=native` | Ottimizzazione massima, incluse istruzioni specifiche della CPU corrente (si veda capitolo 00, sezione 6, per la spiegazione dettagliata del significato e dei rischi di portabilità di `-march=native`) |
-| `-Wall` | Abilita l'insieme standard di warning del compilatore — da usare sempre, poiché individua a tempo di compilazione una classe ampia di errori comuni (variabili non inizializzate, confronti sospetti tra tipi diversi, funzioni con valore di ritorno non gestito) prima ancora dell'esecuzione |
-| `-std=c++14` | Seleziona lo standard C++14 (minimo raccomandato per i futuri esercizi nella repo; usare `-std=c++17` se disponibile sul sistema, per accedere a funzionalità del linguaggio più recenti) |
+| `-O2` | Optimization level 2 (a good trade-off between execution speed and ease of debugging; this is the level used as the reference setting in this tutorial's compilation templates) |
+| `-O3 -march=native` | Maximum optimization, including instructions specific to the current CPU (see chapter 00, section 6, for a detailed explanation of the meaning and portability risks of `-march=native`) |
+| `-Wall` | Enables the standard set of compiler warnings — always use this, since it catches, at compile time, a broad class of common errors (uninitialized variables, suspicious comparisons between different types, functions with unhandled return values) before execution even takes place |
+| `-std=c++14` | Selects the C++14 standard (the minimum recommended for future exercises in the repo; use `-std=c++17` if available on the system, to access more recent language features) |
 
-### Verificare la propria installazione MPI
+### Checking your MPI installation
 
 ```bash
-# Verifica quale implementazione MPI è installata
-mpicxx --version          # mostra il compilatore sottostante utilizzato dal wrapper
-mpirun --version          # mostra l'implementazione MPI (OpenMPI, MPICH, ecc.)
+# Check which MPI implementation is installed
+mpicxx --version          # shows the underlying compiler used by the wrapper
+mpirun --version          # shows the MPI implementation (OpenMPI, MPICH, etc.)
 
-# Ubuntu/Debian: installazione di OpenMPI
+# Ubuntu/Debian: installing OpenMPI
 sudo apt install libopenmpi-dev openmpi-bin
 
-# Ubuntu/Debian: installazione di MPICH (alternativa)
+# Ubuntu/Debian: installing MPICH (alternative)
 sudo apt install mpich
 ```
 
-> Le due implementazioni principali sono **OpenMPI** e **MPICH**. Per gli esercizi successivi sono intercambiabili, poiché entrambe implementano fedelmente lo standard MPI e la sintassi del codice C++ presentato non dipende da alcuna estensione specifica dell'una o dell'altra.
+> The two main implementations are **OpenMPI** and **MPICH**. For the exercises that follow they are interchangeable, since both faithfully implement the MPI standard and the C++ code syntax presented does not depend on any extension specific to either one.
 
-## 3. Esecuzione con `mpirun`
+## 3. Running with `mpirun`
 
 ```bash
-# Lancia il programma con N processi paralleli
+# Launch the program with N parallel processes
 mpirun -np 4 ./program
 
-# Equivalente (alcuni sistemi usano mpiexec)
+# Equivalent (some systems use mpiexec)
 mpiexec -n 4 ./program
 
-# Su un cluster con SLURM (senza mpirun diretto)
+# On a cluster with SLURM (no direct mpirun)
 srun --ntasks=4 ./program
 ```
 
-> `-np` e `-n` sono equivalenti tra le implementazioni comuni. Su cluster gestiti da un sistema di scheduling dei job (SLURM, PBS/Torque, LSF), il launcher effettivo dei processi è determinato dal sistema di scheduling stesso, non invocato manualmente dall'utente come nei due comandi precedenti.
+> `-np` and `-n` are equivalent across common implementations. On clusters managed by a job scheduling system (SLURM, PBS/Torque, LSF), the actual process launcher is determined by the scheduling system itself, not invoked manually by the user as in the two previous commands.
 
-Vale la pena chiarire la distinzione tra `mpirun`/`mpiexec` e `srun`: nei primi due casi, è l'implementazione MPI stessa (tramite il proprio launcher) a occuparsi di avviare i processi sui nodi disponibili, tipicamente basandosi su un file di host o su variabili d'ambiente locali; con `srun` (SLURM), è invece il resource manager del cluster a farsi carico dell'allocazione delle risorse (nodi, core, memoria) e dell'avvio dei processi, delegando a MPI unicamente la fase di scoperta reciproca dei processi già lanciati e la costruzione dei canali di comunicazione tra loro (fase nota come *PMI bootstrap*, Process Management Interface). Su un cluster di produzione con SLURM, è quindi tipicamente `srun` (o l'invocazione di `mpirun` all'interno di uno script SLURM, a seconda della configurazione locale) il meccanismo effettivamente usato, non `mpirun` invocato in modo completamente autonomo come si farebbe su una singola workstation di sviluppo.
+It is worth clarifying the distinction between `mpirun`/`mpiexec` and `srun`: in the first two cases, it is the MPI implementation itself (through its own launcher) that takes care of starting the processes on the available nodes, typically based on a host file or local environment variables; with `srun` (SLURM), it is instead the cluster's resource manager that takes charge of allocating resources (nodes, cores, memory) and starting the processes, delegating to MPI only the phase in which the already-launched processes discover one another and build the communication channels between them (a phase known as *PMI bootstrap*, Process Management Interface). On a production cluster running SLURM, it is therefore typically `srun` (or the invocation of `mpirun` from within a SLURM script, depending on the local configuration) that is actually used, rather than `mpirun` invoked completely on its own as one would on a single development workstation.
 
-## 4. Concetti fondamentali di MPI
+## 4. Core MPI concepts
 
-### `MPI_Init` — Inizializzazione
+### `MPI_Init` — Initialization
 
 ```cpp
 MPI_Init(&argc, &argv);
 ```
 
-**Deve essere la prima chiamata MPI** del programma. Inizializza l'ambiente di esecuzione MPI e rende disponibili tutti i meccanismi di comunicazione: prima di questa chiamata, nessuna funzione MPI è utilizzabile .
+**Must be the first MPI call** in the program. It initializes the MPI runtime environment and makes all communication mechanisms available: before this call, no MPI function can be used.
 
-`argc` e `argv` vengono passati da `main` per puntatore perché alcune implementazioni MPI utilizzano gli argomenti da riga di comando per configurazioni interne (ad esempio parametri specifici del launcher, filtrati e rimossi dagli argomenti prima che il programma applicativo li veda), e `MPI_Init` può quindi modificarne il contenuto. È buona pratica passare sempre `argc`/`argv` a `MPI_Init` anche quando il programma applicativo non necessita di argomenti da riga di comando propri, per garantire la piena compatibilità con questo comportamento specifico dell'implementazione.
+`argc` and `argv` are passed from `main` by pointer because some MPI implementations use command-line arguments for internal configuration (for example launcher-specific parameters, filtered out and removed from the arguments before the application program sees them), and `MPI_Init` may therefore modify their contents. It is good practice to always pass `argc`/`argv` to `MPI_Init` even when the application program does not need its own command-line arguments, to guarantee full compatibility with this implementation-specific behavior.
 
-### `MPI_Finalize` — Terminazione
+### `MPI_Finalize` — Shutdown
 
 ```cpp
 MPI_Finalize();
 ```
 
-**Deve essere l'ultima chiamata MPI** del programma. Rilascia tutte le risorse allocate da MPI (buffer di comunicazione interni, canali di rete, strutture dati di gestione dei communicator) e sincronizza la chiusura ordinata di tutti i processi. Nessuna funzione MPI può essere invocata dopo questa chiamata.
+**Must be the last MPI call** in the program. It releases all resources allocated by MPI (internal communication buffers, network channels, communicator management data structures) and synchronizes the orderly shutdown of all processes. No MPI function may be invoked after this call.
 
-> ⚠️ Se il programma termina senza invocare `MPI_Finalize` (ad esempio tramite una `exit()` diretta, oppure a seguito di un crash non gestito), MPI può lasciare processi "zombie" o risorse di comunicazione bloccate sul cluster, con effetti che vanno da un semplice spreco temporaneo di risorse fino, in casi più gravi su sistemi condivisi, alla necessità di intervento manuale dell'amministratore di sistema per liberare le risorse di rete/scheduling rimaste allocate.
+> ⚠️ If the program terminates without invoking `MPI_Finalize` (for example via a direct `exit()`, or as the result of an unhandled crash), MPI may leave "zombie" processes or communication resources locked on the cluster, with effects ranging from a simple temporary waste of resources up to, in more serious cases on shared systems, the need for manual intervention by the system administrator to free the network/scheduling resources that remained allocated.
 
-### `MPI_COMM_WORLD` — Il communicator globale
+### `MPI_COMM_WORLD` — The global communicator
 
 ```cpp
 MPI_COMM_WORLD
 ```
 
-Questo è il **communicator predefinito** che include tutti i processi lanciati da `mpirun`. Un communicator è un gruppo di processi che possono comunicare tra loro (concetto approfondito nel capitolo 01a, sezione 2.3). `MPI_COMM_WORLD` è sempre disponibile immediatamente dopo `MPI_Init` e contiene, per definizione, ogni processo del job MPI corrente: è la scelta di default per la quasi totalità delle comunicazioni presentate negli esercizi successivi della repo.
+This is the **default communicator** that includes all processes launched by `mpirun`. A communicator is a group of processes that can communicate with each other (a concept explored in depth in chapter 01a, section 2.3). `MPI_COMM_WORLD` is always available immediately after `MPI_Init` and contains, by definition, every process of the current MPI job: it is the default choice for nearly all the communications presented in the exercises that follow in the repo.
 
-### `MPI_Comm_rank` — Chi sono io?
+### `MPI_Comm_rank` — Who am I?
 
 ```cpp
 int rank;
 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 ```
 
-Assegna a `rank` l'**identificatore univoco** del processo corrente all'interno del communicator specificato. I rank vanno da `0` a `size-1`. Il rank è il meccanismo con cui ogni processo determina la propria identità e decide il proprio comportamento (ad esempio `if (rank == 0)` per distinguere il processo master, un pattern ricorrente nella repo di questo tutorial).
+Assigns to `rank` the **unique identifier** of the current process within the specified communicator. Ranks range from `0` to `size-1`. The rank is the mechanism by which each process determines its own identity and decides its own behavior (for example `if (rank == 0)` to distinguish the master process, a recurring pattern throughout this tutorial's repo).
 
-### `MPI_Comm_size` — Quanti siamo?
+### `MPI_Comm_size` — How many are we?
 
 ```cpp
 int size;
 MPI_Comm_size(MPI_COMM_WORLD, &size);
 ```
 
-Assegna a `size` il **numero totale di processi** presenti nel communicator specificato. Questo valore corrisponde esattamente a quello passato a `mpirun -np` (o a `-n`, `--ntasks`, a seconda del launcher usato, sezione 3), per il communicator `MPI_COMM_WORLD`.
-## 5. Differenze sintattiche: Fortran `call` vs chiamate dirette in C++
+Assigns to `size` the **total number of processes** present in the specified communicator. This value corresponds exactly to the one passed to `mpirun -np` (or to `-n`, `--ntasks`, depending on the launcher used, section 3), for the `MPI_COMM_WORLD` communicator.
 
-Chi proviene da MPI in Fortran incontrerà immediatamente tre differenze sintattiche sistematiche in ogni programma MPI scritto in C++.
+## 5. Syntactic differences: Fortran `call` vs direct calls in C++
 
-### Assenza della parola chiave `call`
+Anyone coming from MPI in Fortran will immediately encounter three systematic syntactic differences in every MPI program written in C++.
 
-In Fortran, le subroutine vengono invocate con la parola chiave `call`:
+### Absence of the `call` keyword
+
+In Fortran, subroutines are invoked with the `call` keyword:
 
 ```fortran
 call MPI_Init(ierr)
 call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 ```
 
-In C++, le funzioni MPI sono funzioni C standard e vengono invocate direttamente per nome, senza alcuna parola chiave introduttiva:
+In C++, MPI functions are standard C functions and are invoked directly by name, with no introductory keyword:
 
 ```cpp
 MPI_Init(&argc, &argv);
 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 ```
 
-Non esiste alcun equivalente di `call`: ogni routine MPI è semplicemente un'espressione di chiamata a funzione, sintatticamente identica a qualunque altra chiamata di funzione C++.
+There is no equivalent of `call`: every MPI routine is simply a function call expression, syntactically identical to any other C++ function call.
 
-### Codice di errore: ultimo argomento vs valore di ritorno
+### Error code: last argument vs return value
 
-In Fortran, ogni routine MPI accetta `ierr` come **ultimo argomento**, un parametro di output tramite cui la routine comunica l'esito dell'operazione:
+In Fortran, every MPI routine accepts `ierr` as its **last argument**, an output parameter through which the routine communicates the outcome of the operation:
 
 ```fortran
 call MPI_Send(buf, count, MPI_DOUBLE_PRECISION, dest, tag, MPI_COMM_WORLD, ierr)
 ```
 
-In C++, il codice di errore è invece il **valore di ritorno** della funzione stessa:
+In C++, the error code is instead the **return value** of the function itself:
 
 ```cpp
 int err = MPI_Send(buf, count, MPI_DOUBLE, dest, tag, MPI_COMM_WORLD);
 ```
 
-In pratica, nel codice di questo tutorial il valore di ritorno viene spesso ignorato (nessuna delle due varianti, `int err = ...` o la chiamata "nuda" senza assegnazione, altera il comportamento della chiamata stessa), ma può e dovrebbe essere controllato esplicitamente, tipicamente confrontandolo con la costante `MPI_SUCCESS`. Il comportamento di default di MPI, in assenza di un error handler personalizzato installato esplicitamente tramite `MPI_Comm_set_errhandler` (non trattato successivamente nella repo), è comunque quello di terminare il programma con un messaggio diagnostico alla prima condizione di errore rilevata, rendendo il controllo esplicito del valore di ritorno una misura di robustezza aggiuntiva più che strettamente necessaria per la correttezza degli esercizi qui presentati.
+In practice, in the code of this tutorial the return value is often ignored (neither of the two variants, `int err = ...` or the "bare" call with no assignment, alters the behavior of the call itself), but it can and should be checked explicitly, typically by comparing it against the `MPI_SUCCESS` constant. MPI's default behavior, in the absence of a custom error handler explicitly installed via `MPI_Comm_set_errhandler` (not covered later in the repo), is in any case to terminate the program with a diagnostic message at the first detected error condition, making explicit checking of the return value an additional robustness measure rather than strictly necessary for the correctness of the exercises presented here.
 
-### Puntatori per gli argomenti di output
+### Pointers for output arguments
 
-Questa è la differenza più importante e la fonte più comune di errori di compilazione per chi proviene da Fortran. In Fortran, tutti gli argomenti sono passati **per riferimento di default** — è il compilatore a gestire automaticamente gli indirizzi di memoria, in modo trasparente al programmatore:
+This is the most important difference and the most common source of compilation errors for those coming from Fortran. In Fortran, all arguments are passed **by reference by default** — the compiler handles memory addresses automatically, transparently to the programmer:
 
 ```fortran
 integer :: rank
 call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-! Fortran passa automaticamente l'indirizzo di 'rank' a MPI
+! Fortran automatically passes the address of 'rank' to MPI
 ```
 
-In C++, quando MPI deve **scrivere un valore in una variabile** (un argomento di output), è necessario passarne esplicitamente l'indirizzo tramite l'operatore `&`:
+In C++, when MPI needs to **write a value into a variable** (an output argument), its address must be passed explicitly using the `&` operator:
 
 ```cpp
 int rank;
 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 //                             ^
-//                             Obbligatorio: passa l'indirizzo di memoria di 'rank'
-//                             Senza &, MPI non può modificare la variabile
-//                             (verrebbe passato il VALORE corrente, non
-//                             indefinito ma inutile ai fini della chiamata:
-//                             il compilatore C++ segnalerebbe comunque un
-//                             errore di tipo, dato che MPI_Comm_rank si
-//                             aspetta un int*, non un int)
+//                             Required: passes the memory address of 'rank'
+//                             Without &, MPI cannot modify the variable
+//                             (the current VALUE would be passed instead, not
+//                             undefined but useless for the purposes of the call:
+//                             the C++ compiler would in any case report a
+//                             type error, since MPI_Comm_rank expects an
+//                             int*, not an int)
 ```
 
-Per i **buffer di dati** (array), non è necessario l'operatore `&`, perché il nome di un array decade automaticamente a un puntatore al suo primo elemento, secondo la semantica standard del linguaggio C/C++:
+For **data buffers** (arrays), the `&` operator is not needed, because an array name automatically decays to a pointer to its first element, according to the standard semantics of the C/C++ language:
 
 ```cpp
 double buf[100];
 MPI_Send(buf, 100, MPI_DOUBLE, dest, tag, MPI_COMM_WORLD);
-//        ^ nessun & necessario: 'buf' è già un puntatore
+//        ^ no & needed: 'buf' is already a pointer
 
-// Con std::vector, si usa .data() per ottenere il puntatore al buffer interno:
+// With std::vector, use .data() to get the pointer to the internal buffer:
 std::vector<double> v(100);
 MPI_Send(v.data(), 100, MPI_DOUBLE, dest, tag, MPI_COMM_WORLD);
 ```
 
-**Riferimento rapido:**
+**Quick reference:**
 
-| Tipo di argomento | Fortran | C++ |
+| Argument type | Fortran | C++ |
 | --- | --- | --- |
-| Scalare di output (rank, size, ecc.) | `rank` | `&rank` |
-| Array di dati | `buf` | `buf` oppure `v.data()` |
+| Scalar output (rank, size, etc.) | `rank` | `&rank` |
+| Data array | `buf` | `buf` or `v.data()` |
 | Communicator (input) | `MPI_COMM_WORLD` | `MPI_COMM_WORLD` |
 | Request (output) | `request` | `&request` |
-| Status (output) | `status` | `&status` oppure `MPI_STATUS_IGNORE` |
+| Status (output) | `status` | `&status` or `MPI_STATUS_IGNORE` |
 
-## 6. Struttura minima di ogni programma MPI
+## 6. Minimal structure of every MPI program
 
-Questo è il template di partenza da cui derivano tutti gli esercizi successivi:
+This is the starting template from which all subsequent exercises are derived:
 
 ```cpp
 #include <mpi.h>
@@ -267,39 +268,39 @@ Questo è il template di partenza da cui derivano tutti gli esercizi successivi:
 
 int main(int argc, char* argv[]) {
 
-    // ── 1. Inizializzazione ──────────────────────────────────────────
+    // ── 1. Initialization ────────────────────────────────────────────
     MPI_Init(&argc, &argv);
 
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    // ── 2. Logica del programma ──────────────────────────────────────
-    // Questo codice viene eseguito da TUTTI i processi simultaneamente.
-    // La variabile 'rank' viene usata per differenziarne il comportamento.
+    // ── 2. Program logic ─────────────────────────────────────────────
+    // This code is executed by ALL processes simultaneously.
+    // The 'rank' variable is used to differentiate their behavior.
 
     if (rank == 0) {
-        // Solo il processo master (rank 0) esegue questo blocco
+        // Only the master process (rank 0) runs this block
         std::cout << "Master: running with " << size << " processes." << std::endl;
     } else {
-        // Tutti gli altri processi eseguono questo
+        // All other processes run this
         std::cout << "Worker " << rank << ": ready." << std::endl;
     }
 
-    // ── 3. Terminazione ───────────────────────────────────────────────
+    // ── 3. Shutdown ──────────────────────────────────────────────────
     MPI_Finalize();
     return 0;
 }
 ```
 
-### Compilazione ed esecuzione
+### Compilation and execution
 
 ```bash
 mpicxx -O2 -Wall -o hello hello.cpp
 mpirun -np 4 ./hello
 ```
 
-### Output atteso (l'ordine può variare)
+### Expected output (order may vary)
 
 ```text
 Master: running with 4 processes.
@@ -308,70 +309,70 @@ Worker 3: ready.
 Worker 2: ready.
 ```
 
-> L'ordine dell'output è **non deterministico**: ogni processo scrive su `cout` non appena raggiunge quella riga di codice, indipendentemente dagli altri processi, che procedono con la propria esecuzione a velocità non sincronizzata tra loro. Questo è normale e atteso in MPI. Va inoltre notato che, trattandosi di `size` processi indipendenti (non thread di uno stesso processo con uno stream `cout` fisicamente condiviso), le singole scritture su `cout` di ciascun processo non rischiano interleaving *a livello di singolo carattere* all'interno della stessa riga (ogni processo scrive sul proprio stream di standard output indipendente, tipicamente instradato dal launcher MPI verso lo stesso terminale), ma **l'ordine relativo tra righe emesse da processi diversi** non è in alcun modo garantito dallo standard MPI, e può variare da un'esecuzione all'altra dello stesso identico programma, anche a parità di hardware e di numero di processi.
+> The order of the output is **non-deterministic**: each process writes to `cout` as soon as it reaches that line of code, independently of the other processes, which proceed with their own execution at speeds that are not synchronized with one another. This is normal and expected in MPI. It should also be noted that, since these are `size` independent processes (not threads of a single process sharing a physically common `cout` stream), the individual writes to `cout` from each process do not risk interleaving *at the level of individual characters* within the same line (each process writes to its own independent standard output stream, typically routed by the MPI launcher to the same terminal), but **the relative order between lines emitted by different processes** is in no way guaranteed by the MPI standard, and can vary from one run to another of the exact same program, even with identical hardware and number of processes.
 
-## 7. Errori comuni da evitare
+## 7. Common mistakes to avoid
 
-### Dimenticare `MPI_Init` o `MPI_Finalize`
+### Forgetting `MPI_Init` or `MPI_Finalize`
 
 ```cpp
-// SBAGLIATO: chiamata MPI prima di Init
+// WRONG: MPI call before Init
 int rank;
-MPI_Comm_rank(MPI_COMM_WORLD, &rank);  // comportamento indefinito
+MPI_Comm_rank(MPI_COMM_WORLD, &rank);  // undefined behavior
 MPI_Init(&argc, &argv);
 ```
 
 ```cpp
-// SBAGLIATO: uscita dal programma senza Finalize
+// WRONG: exiting the program without Finalize
 MPI_Init(&argc, &argv);
 // ...
-return 0;  // MPI non è stato terminato correttamente
+return 0;  // MPI was not shut down correctly
 ```
 
-### Stampare senza controllare il rank
+### Printing without checking the rank
 
 ```cpp
-// SPESSO NON INTENZIONALE: ogni processo stampa la stessa riga
-// → output ripetuto una volta per ciascun processo
+// OFTEN UNINTENTIONAL: every process prints the same line
+// → output repeated once per process
 std::cout << "Final result: " << result << std::endl;
 
-// CORRETTO: solo il processo 0 stampa il risultato globale
+// CORRECT: only process 0 prints the global result
 if (rank == 0)
     std::cout << "Final result: " << result << std::endl;
 ```
 
-Questo errore è particolarmente insidioso quando `result` è, in realtà, un valore che **dovrebbe** essere identico su tutti i processi (ad esempio l'esito di una `MPI_Allreduce`, capitolo 02, sezione 6): il programma produce output apparentemente "corretto" nel valore numerico stampato, ma ripetuto `size` volte, un difetto facilmente trascurato durante lo sviluppo su un numero ridotto di processi e che diventa rapidamente fastidioso (o problematico, se l'output viene reindirizzato e successivamente processato da script automatici) al crescere del numero di processi impiegati.
+This mistake is particularly insidious when `result` is, in fact, a value that **should** be identical across all processes (for example the outcome of an `MPI_Allreduce`, chapter 02, section 6): the program produces output that is apparently "correct" in the numerical value printed, but repeated `size` times — a flaw that is easily overlooked during development with a small number of processes, and that quickly becomes annoying (or problematic, if the output is redirected and subsequently processed by automated scripts) as the number of processes used grows.
 
-### Usare buffer non inizializzati nelle chiamate MPI
+### Using uninitialized buffers in MPI calls
 
 ```cpp
-// SBAGLIATO: buf non è inizializzato; MPI_Recv scriverà in memoria indefinita
+// WRONG: buf is uninitialized; MPI_Recv will write into undefined memory
 double buf;
 MPI_Recv(&buf, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-// CORRETTO: inizializzare sempre i buffer di ricezione
+// CORRECT: always initialize receive buffers
 double buf = 0.0;
 MPI_Recv(&buf, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 ```
 
-Va chiarito il motivo tecnico di questa raccomandazione: `MPI_Recv` sovrascriverà comunque interamente `buf` con il contenuto del messaggio ricevuto (assumendo che la ricezione vada a buon fine), quindi il valore iniziale di `buf` non influenza mai il *risultato* dell'operazione di ricezione in sé. L'inizializzazione esplicita è però una misura di robustezza difensiva rilevante in scenari più complessi: in fase di debug (per distinguere a colpo d'occhio, in un dump di memoria o in un debugger, un buffer effettivamente popolato da MPI da uno mai toccato per un bug nel matching sender/receiver), e soprattutto in scenari in cui la ricezione potrebbe fallire silenziosamente o non completarsi per un errore logico altrove nel programma (ad esempio un mismatch di tag o rank, capitolo 01a, sezione 12): un buffer inizializzato a un valore noto e riconoscibile (es. `0.0`, o un valore sentinella chiaramente anomalo per il dominio applicativo) rende molto più agevole diagnosticare, a posteriori, se quella particolare ricezione sia effettivamente avvenuta come previsto.
+The technical reason behind this recommendation should be made clear: `MPI_Recv` will in any case fully overwrite `buf` with the contents of the received message (assuming the reception succeeds), so the initial value of `buf` never influences the *result* of the receive operation itself. Explicit initialization is, however, a relevant defensive robustness measure in more complex scenarios: during debugging (to distinguish at a glance, in a memory dump or in a debugger, a buffer actually populated by MPI from one never touched due to a sender/receiver matching bug), and especially in scenarios where the reception might silently fail or not complete due to a logic error elsewhere in the program (for example a tag or rank mismatch, chapter 01a, section 12): a buffer initialized to a known, recognizable value (e.g. `0.0`, or a sentinel value clearly anomalous for the application domain) makes it much easier to diagnose, after the fact, whether that particular reception actually occurred as expected.
 
-## 8. Collegamento con il resto della repo
+## 8. Connection to the rest of the repo
 
-Una volta chiara questa struttura di base, ogni esercizio segue lo stesso pattern generale: `MPI_Init` → logica differenziata per rank → `MPI_Finalize`. Ciò che cambia, capitolo dopo capitolo, è esclusivamente la **logica di comunicazione** inserita nel mezzo:
+Once this basic structure is clear, every exercise follows the same general pattern: `MPI_Init` → rank-differentiated logic → `MPI_Finalize`. What changes, chapter after chapter, is exclusively the **communication logic** inserted in between:
 
 ```text
-getting_started.md        ←  sei qui
+getting_started.md        ←  you are here
         ↓
-00_Intro/                 ←  capitolo 00 — motivazioni, C++ per l'HPC, librerie numeriche
+00_Intro/                 ←  chapter 00 — motivations, C++ for HPC, numerical libraries
         ↓
-01_Point_to_Point/         ←  capitolo 01a/01b — MPI_Send/MPI_Recv (bloccante e non bloccante) tra due processi
+01_Point_to_Point/         ←  chapter 01a/01b — MPI_Send/MPI_Recv (blocking and non-blocking) between two processes
         ↓
-02_Collective/              ←  capitolo 02 — Bcast, Scatter, Gather, Reduce tra tutti i processi
+02_Collective/              ←  chapter 02 — Bcast, Scatter, Gather, Reduce across all processes
         ↓
 03_Topologies/
-   ├── Jacobi/                ←  capitolo 03a — solutore di Jacobi distribuito
-   └── Virtual_Topologies/    ←  capitolo 03b — griglie cartesiane virtuali
+   ├── Jacobi/                ←  chapter 03a — distributed Jacobi solver
+   └── Virtual_Topologies/    ←  chapter 03b — virtual Cartesian grids
 ```
 
-Questo documento, insieme al readme del capitolo 00_intro, costituisce quindi il prerequisito comune a tutti i capitoli successivi: da qui in avanti, ogni nuovo capitolo introdurrà esclusivamente le funzioni MPI specifiche del pattern di comunicazione trattato, dando per acquisita la struttura generale (`Init`/`Finalize`, gestione del rank, compilazione con `mpicxx`, esecuzione con `mpirun`) presentata in questo documento.
+This document, together with the readme of chapter 00_intro, therefore constitutes the common prerequisite for all subsequent chapters: from here on, each new chapter will introduce exclusively the MPI functions specific to the communication pattern being covered, taking for granted the general structure (`Init`/`Finalize`, rank handling, compilation with `mpicxx`, execution with `mpirun`) presented in this document.
