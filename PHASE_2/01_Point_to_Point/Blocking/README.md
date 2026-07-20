@@ -1,84 +1,84 @@
-# 01a — Comunicazione Point-to-Point Bloccante in MPI
+# 01a — Blocking Point-to-Point Communication in MPI
 
 ---
 
-## Indice
+## Table of Contents
 
-1. [Cos'è MPI e perché esiste](#1-cosè-mpi-e-perché-esiste)
-2. [Concetti fondamentali: processo, rank, communicator](#2-concetti-fondamentali-processo-rank-communicator)
-3. [Cos'è la comunicazione Point-to-Point](#3-cosè-la-comunicazione-point-to-point)
-4. [MPI_Send e MPI_Recv](#4-mpi_send-e-mpi_recv)
-5. [Semantica Bloccante: cosa significa davvero "blocking"](#5-semantica-bloccante-cosa-significa-davvero-blocking)
-6. [Deadlock: la trappola più comune](#6-deadlock-la-trappola-più-comune)
-7. [MPI_Barrier: sincronizzazione collettiva bloccante](#7-mpi_barrier-sincronizzazione-collettiva-bloccante)
-8. [MPI_Status: chi mi ha scritto, cosa, quanto](#8-mpi_status-chi-mi-ha-scritto-cosa-quanto)
-9. [Esercizi guidati](#9-esercizi-guidati)
-10. [Output atteso e come interpretarlo](#10-output-atteso-e-come-interpretarlo)
-11. [Errori comuni e come evitarli](#11-errori-comuni-e-come-evitarli)
+1. [What MPI is and why it exists](#1-what-mpi-is-and-why-it-exists)
+2. [Fundamental concepts: process, rank, communicator](#2-fundamental-concepts-process-rank-communicator)
+3. [What Point-to-Point communication is](#3-what-point-to-point-communication-is)
+4. [MPI_Send and MPI_Recv](#4-mpi_send-and-mpi_recv)
+5. [Blocking semantics: what "blocking" really means](#5-blocking-semantics-what-blocking-really-means)
+6. [Deadlock: the most common trap](#6-deadlock-the-most-common-trap)
+7. [MPI_Barrier: blocking collective synchronization](#7-mpi_barrier-blocking-collective-synchronization)
+8. [MPI_Status: who wrote to me, what, how much](#8-mpi_status-who-wrote-to-me-what-how-much)
+9. [Guided exercises](#9-guided-exercises)
+10. [Expected output and how to interpret it](#10-expected-output-and-how-to-interpret-it)
+11. [Common mistakes and how to avoid them](#11-common-mistakes-and-how-to-avoid-them)
 
 ---
 
-## 1. Cos'è MPI e perché esiste
+## 1. What MPI is and why it exists
 
-**MPI (Message Passing Interface)** è uno standard (non un linguaggio, non una libreria specifica) che definisce come processi diversi, in esecuzione su core o macchine diverse, possano **scambiarsi dati** per collaborare alla soluzione di un problema.
+**MPI (Message Passing Interface)** is a standard (not a language, not a specific library) that defines how different processes, running on different cores or machines, can **exchange data** to cooperate in solving a problem.
 
-Il modello di programmazione di MPI si chiama **message passing** ("scambio di messaggi"): a differenza della programmazione multithread (es. OpenMP), dove i thread condividono la stessa memoria, in MPI **ogni processo ha la propria memoria privata**. Se il processo A vuole che il processo B conosca un valore, deve *inviarglielo esplicitamente* attraverso un messaggio: non esiste memoria condivisa di default.
+MPI's programming model is called **message passing**: unlike multithreaded programming (e.g. OpenMP), where threads share the same memory, in MPI **every process has its own private memory**. If process A wants process B to know a value, it must *explicitly send it* through a message: there is no shared memory by default.
 
-Questo modello è alla base del calcolo distribuito su cluster HPC, dove centinaia o migliaia di nodi, ciascuno con la propria RAM, devono cooperare.
+This model is the foundation of distributed computing on HPC clusters, where hundreds or thousands of nodes, each with its own RAM, must cooperate.
 
 ```
-Nodo 0 (RAM propria)        Nodo 1 (RAM propria)
+Node 0 (own RAM)             Node 1 (own RAM)
 ┌─────────────────┐         ┌─────────────────┐
-│  Processo 0      │         │  Processo 1      │
+│  Process 0       │         │  Process 1       │
 │  int x = 42;     │  msg    │  int x = ???;    │
 │                  │ ──────► │  MPI_Recv(&x,..) │
 └─────────────────┘         └─────────────────┘
 ```
 
-## 2. Concetti fondamentali: processo, rank, communicator
+## 2. Fundamental concepts: process, rank, communicator
 
-Prima di poter capire `MPI_Send`/`MPI_Recv` servono tre concetti chiave.
+Before understanding `MPI_Send`/`MPI_Recv`, three key concepts are needed.
 
-### 2.1 Processo
+### 2.1 Process
 
-Quando lanci un programma MPI con, ad esempio, 4 processi, il sistema operativo crea **4 istanze indipendenti** dello stesso eseguibile, ciascuna con la propria memoria, il proprio stack, le proprie variabili. Non sono thread: sono processi a tutti gli effetti, spesso distribuiti su core o nodi fisici diversi.
+When you launch an MPI program with, say, 4 processes, the operating system creates **4 independent instances** of the same executable, each with its own memory, its own stack, its own variables. They are not threads: they are processes in every respect, often distributed across different physical cores or nodes.
 
-Tutti e 4 eseguono **lo stesso codice sorgente** (modello SPMD: *Single Program, Multiple Data*), ma si comportano in modo diverso a seconda del proprio *rank* — vedi sotto.
+All 4 execute **the same source code** (SPMD model: *Single Program, Multiple Data*), but behave differently depending on their own *rank* — see below.
 
 ### 2.2 Rank
 
-Il **rank** è un intero univoco (da `0` a `size-1`) che identifica un processo all'interno di un gruppo di processi. È l'equivalente di un "indirizzo" o "nome" del processo, usato per decidere chi invia a chi.
+The **rank** is a unique integer (from `0` to `size-1`) that identifies a process within a group of processes. It is the equivalent of an "address" or "name" for the process, used to decide who sends to whom.
 
 ```cpp
 int rank, size;
-MPI_Comm_rank(MPI_COMM_WORLD, &rank);  // "chi sono io?" -> il mio rank
-MPI_Comm_size(MPI_COMM_WORLD, &size);  // "quanti siamo in totale?"
+MPI_Comm_rank(MPI_COMM_WORLD, &rank);  // "who am I?" -> my rank
+MPI_Comm_size(MPI_COMM_WORLD, &size);  // "how many of us are there in total?"
 ```
 
-Grazie al rank, un unico file sorgente può far comportare i processi in modo diverso:
+Thanks to the rank, a single source file can make processes behave differently:
 
 ```cpp
 if (rank == 0) {
-    // solo il processo 0 esegue questo blocco
+    // only process 0 executes this block
 } else {
-    // tutti gli altri eseguono quest'altro
+    // all others execute this other one
 }
 ```
 
 ### 2.3 Communicator
 
-Un **communicator** è un gruppo di processi che possono comunicare tra loro. `MPI_COMM_WORLD` è il communicator "di default", creato automaticamente all'avvio, e contiene **tutti** i processi lanciati dal programma. In generale è spesso usato `MPI_COMM_WORLD`, ma è utile sapere che MPI permette di creare sotto-gruppi personalizzati (vedi capitolo relativo a virtual topologies).
+A **communicator** is a group of processes that can communicate with each other. `MPI_COMM_WORLD` is the "default" communicator, automatically created at startup, and contains **all** the processes launched by the program. In general `MPI_COMM_WORLD` is used frequently, but it is useful to know that MPI allows custom sub-groups to be created (see the chapter on virtual topologies).
 
-Ogni operazione di comunicazione MPI avviene **all'interno di un communicator**: il rank di un processo è infatti relativo al communicator ("processo 2 in `MPI_COMM_WORLD`" può avere un rank diverso in un altro communicator).
+Every MPI communication operation takes place **within a communicator**: a process's rank is in fact relative to the communicator ("process 2 in `MPI_COMM_WORLD`" may have a different rank in another communicator).
 
-## 3. Cos'è la comunicazione Point-to-Point
+## 3. What Point-to-Point communication is
 
-La comunicazione **point-to-point (P2P)** è la forma più elementare di scambio messaggi in MPI: **un solo processo mittente (sender)** invia dati a **un solo processo destinatario (receiver)**, in modo esplicito e diretto.
+**Point-to-point (P2P)** communication is the most elementary form of message exchange in MPI: **a single sender process** sends data to **a single receiver process**, explicitly and directly.
 
-Si contrappone alle comunicazioni **collettive** (es. `MPI_Bcast`, `MPI_Reduce`), dove un'operazione coinvolge simultaneamente tutti i processi di un communicator. La P2P, invece, è sempre una relazione **1 a 1**: un sender e un receiver, identificati esplicitamente tramite il loro rank.
+It stands in contrast to **collective** communications (e.g. `MPI_Bcast`, `MPI_Reduce`), where an operation simultaneously involves all the processes of a communicator. P2P, on the other hand, is always a **1-to-1** relationship: a sender and a receiver, explicitly identified by their rank.
 
 ```
-Processo 0                          Processo 1
+Process 0                            Process 1
     │                                   │
     │  MPI_Send(buf, count, type,       │
     │           dest=1, tag, comm)      │
@@ -87,248 +87,248 @@ Processo 0                          Processo 1
     │                                   │           src=0, tag, comm, &status)
 ```
 
-Affinché la comunicazione avvenga con successo, è necessario che:
+For the communication to succeed, the following must hold:
 
-1. Il sender chiami `MPI_Send` specificando il rank del destinatario (`dest`).
-2. Il receiver chiami `MPI_Recv` specificando il rank del mittente atteso (`source`), oppure `MPI_ANY_SOURCE` per accettare da chiunque.
-3. Tag e datatype dei due lati **combacino** (vedi sezione 4.3).
+1. The sender calls `MPI_Send` specifying the rank of the recipient (`dest`).
+2. The receiver calls `MPI_Recv` specifying the rank of the expected sender (`source`), or `MPI_ANY_SOURCE` to accept from anyone.
+3. The tag and datatype on the two sides **match** (see section 4.3).
 
-Se anche una sola di queste condizioni non è soddisfatta, la comunicazione non avviene (o, peggio, il programma resta bloccato in attesa — vedi sezione 6 sui deadlock).
+If even one of these conditions is not met, the communication does not take place (or, worse, the program remains blocked waiting — see section 6 on deadlocks).
 
-## 4. MPI_Send e MPI_Recv
+## 4. MPI_Send and MPI_Recv
 
-Queste due funzioni sono il cuore della comunicazione P2P bloccante. Analizziamo ogni parametro nel dettaglio, perché è essenziale capirne il significato prima di scrivere codice.
+These two functions are the core of blocking P2P communication. Let's analyze each parameter in detail, since it is essential to understand its meaning before writing code.
 
-### 4.1 MPI_Send — Prototipo commentato
+### 4.1 MPI_Send — Annotated prototype
 
 ```cpp
 int MPI_Send(
-    const void*  buf,      // puntatore al buffer di invio: l'indirizzo di
-                            // memoria da cui MPI leggerà i dati da spedire
-    int          count,    // quanti elementi inviare (NON byte, ma numero
-                            // di elementi del tipo indicato in datatype)
-    MPI_Datatype datatype, // tipo MPI degli elementi (es. MPI_INT, MPI_DOUBLE,
-                            // MPI_CHAR...). Serve perché MPI deve sapere come
-                            // interpretare/convertire i byte, specie tra
-                            // architetture diverse
-    int          dest,     // rank del processo destinatario, all'interno
-                            // del communicator comm
-    int          tag,      // un intero >= 0 scelto dal programmatore, usato
-                            // come "etichetta" del messaggio (vedi 4.3)
-    MPI_Comm     comm      // il communicator in cui avviene la comunicazione
-                            // (tipicamente MPI_COMM_WORLD)
+    const void*  buf,      // pointer to the send buffer: the memory address
+                            // from which MPI will read the data to send
+    int          count,    // how many elements to send (NOT bytes, but the
+                            // number of elements of the type given in datatype)
+    MPI_Datatype datatype, // MPI type of the elements (e.g. MPI_INT, MPI_DOUBLE,
+                            // MPI_CHAR...). Needed because MPI must know how
+                            // to interpret/convert the bytes, especially
+                            // between different architectures
+    int          dest,     // rank of the destination process, within
+                            // the communicator comm
+    int          tag,      // an integer >= 0 chosen by the programmer, used
+                            // as a "label" for the message (see 4.3)
+    MPI_Comm     comm      // the communicator in which the communication
+                            // takes place (typically MPI_COMM_WORLD)
 );
 ```
 
-Esempio pratico: il processo 0 invia un singolo intero al processo 1, con tag 0.
+Practical example: process 0 sends a single integer to process 1, with tag 0.
 
 ```cpp
 int valore = 42;
 MPI_Send(&valore, 1, MPI_INT, 1, 0, MPI_COMM_WORLD);
 //         │       │    │     │  │
 //         │       │    │     │  └─ tag = 0
-//         │       │    │     └──── destinatario: rank 1
-//         │       │    └────────── tipo: un intero MPI_INT
-//         │       └─────────────── count: invio 1 solo elemento
-//         └─────────────────────── indirizzo del dato da inviare
+//         │       │    │     └──── destination: rank 1
+//         │       │    └────────── type: an MPI_INT integer
+//         │       └─────────────── count: sending only 1 element
+//         └─────────────────────── address of the data to send
 ```
 
-### 4.2 MPI_Recv — Prototipo commentato
+### 4.2 MPI_Recv — Annotated prototype
 
 ```cpp
 int MPI_Recv(
-    void*        buf,      // puntatore al buffer di ricezione: l'indirizzo
-                            // di memoria in cui MPI scriverà i dati ricevuti
-    int          count,    // capacità MASSIMA del buffer, in numero di
-                            // elementi (il messaggio ricevuto può essere
-                            // più corto, ma non più lungo)
-    MPI_Datatype datatype, // deve corrispondere al datatype usato dal sender
-    int          source,   // rank del mittente atteso, oppure MPI_ANY_SOURCE
-                            // per accettare un messaggio da qualsiasi processo
-    int          tag,      // tag atteso, oppure MPI_ANY_TAG per accettare
-                            // qualsiasi tag
-    MPI_Comm     comm,     // deve essere lo stesso communicator usato dal sender
-    MPI_Status*  status    // struttura in cui MPI scrive informazioni sul
-                            // messaggio ricevuto (mittente reale, tag reale,
-                            // quanti elementi sono arrivati davvero)
+    void*        buf,      // pointer to the receive buffer: the memory
+                            // address into which MPI will write the received data
+    int          count,    // MAXIMUM capacity of the buffer, in number of
+                            // elements (the received message may be
+                            // shorter, but not longer)
+    MPI_Datatype datatype, // must match the datatype used by the sender
+    int          source,   // rank of the expected sender, or MPI_ANY_SOURCE
+                            // to accept a message from any process
+    int          tag,      // expected tag, or MPI_ANY_TAG to accept
+                            // any tag
+    MPI_Comm     comm,     // must be the same communicator used by the sender
+    MPI_Status*  status    // structure into which MPI writes information about
+                            // the received message (actual sender, actual tag,
+                            // how many elements actually arrived)
 );
 ```
 
-Esempio corrispondente lato ricevente (processo 1):
+Corresponding example on the receiving side (process 1):
 
 ```cpp
 int valore_ricevuto;
 MPI_Status status;
 MPI_Recv(&valore_ricevuto, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
-// Dopo questa chiamata, valore_ricevuto == 42
+// After this call, valore_ricevuto == 42
 ```
 
-### 4.3 Come sender e receiver si "trovano": il matching dei messaggi
+### 4.3 How sender and receiver "find" each other: message matching
 
-MPI abbina un `MPI_Send` al suo `MPI_Recv` corrispondente confrontando **tre chiavi**:
+MPI pairs an `MPI_Send` with its corresponding `MPI_Recv` by comparing **three keys**:
 
-| Chiave      | Lato Send                | Lato Recv                              |
-|-------------|---------------------------|------------------------------------------|
-| communicator| `comm`                     | `comm` (deve essere lo stesso)           |
-| rank        | `dest` (chi riceve)        | `source` (chi invia, o `MPI_ANY_SOURCE`) |
-| tag         | `tag`                      | `tag` (o `MPI_ANY_TAG`)                  |
+| Key         | Send side                  | Recv side                                |
+|-------------|-----------------------------|--------------------------------------------|
+| communicator| `comm`                      | `comm` (must be the same)                  |
+| rank        | `dest` (who receives)       | `source` (who sends, or `MPI_ANY_SOURCE`)  |
+| tag         | `tag`                       | `tag` (or `MPI_ANY_TAG`)                   |
 
-Il **tag** è semplicemente un numero intero a scelta del programmatore, utile per distinguere messaggi diversi tra la stessa coppia di processi. Ad esempio, se il processo 0 invia sia una temperatura sia una pressione al processo 1, può usare tag diversi (`tag=1` per la temperatura, `tag=2` per la pressione) così il receiver sa sempre cosa sta arrivando, anche se i due `MPI_Recv` non sono nello stesso ordine dei due `MPI_Send`.
+The **tag** is simply an integer chosen by the programmer, useful for distinguishing different messages between the same pair of processes. For example, if process 0 sends both a temperature and a pressure reading to process 1, it can use different tags (`tag=1` for the temperature, `tag=2` for the pressure) so that the receiver always knows what is arriving, even if the two `MPI_Recv` calls are not in the same order as the two `MPI_Send` calls.
 
-## 5. Semantica Bloccante: cosa significa davvero "blocking"
+## 5. Blocking semantics: what "blocking" really means
 
-Il concetto di "Bloccante" **non** significa "il messaggio è arrivato a destinazione". ma qualcosa di piu strutturato.
+The concept of "Blocking" does **not** mean "the message has arrived at its destination", but something more structured.
 
-### 5.1 MPI_Send bloccante
+### 5.1 Blocking MPI_Send
 
-> `MPI_Send` **ritorna (sblocca il processo chiamante) solo quando il buffer di invio (`buf`) può essere riutilizzato in sicurezza** — ad esempio per scriverci sopra un nuovo valore — **senza rischiare di corrompere il messaggio in transito**.
+> `MPI_Send` **returns (unblocks the calling process) only when the send buffer (`buf`) can be safely reused** — for example to write a new value into it — **without risking corruption of the message in transit**.
 
-Questo **non implica** che il messaggio sia già stato ricevuto dal destinatario! A seconda dell'implementazione MPI e della dimensione del messaggio:
+This **does not imply** that the message has already been received by the recipient! Depending on the MPI implementation and the message size:
 
-* Per messaggi **piccoli**, MPI può copiare i dati in un buffer di sistema interno e ritornare subito, anche se il receiver non ha ancora chiamato `MPI_Recv`.
-* Per messaggi **grandi**, MPI potrebbe invece dover aspettare che il receiver sia pronto a ricevere direttamente nel suo buffer, per evitare di copiare grandi quantità di dati inutilmente.
+* For **small** messages, MPI may copy the data into an internal system buffer and return immediately, even if the receiver has not yet called `MPI_Recv`.
+* For **large** messages, MPI may instead need to wait until the receiver is ready to receive directly into its buffer, to avoid needlessly copying large amounts of data.
 
-Per questo motivo il comportamento di `MPI_Send` (se blocca "a lungo" o "quasi subito") **non va mai dato per scontato**: un programma corretto deve funzionare indipendentemente da questa scelta implementativa, e non deve mai assumere che "il send è tornato" equivalga a "il receiver ha già i dati".
+For this reason, the behavior of `MPI_Send` (whether it blocks "for a long time" or "almost immediately") should **never be taken for granted**: a correct program must work regardless of this implementation choice, and must never assume that "the send has returned" is equivalent to "the receiver already has the data".
 
-### 5.2 MPI_Recv bloccante
+### 5.2 Blocking MPI_Recv
 
-> `MPI_Recv` **ritorna solo quando l'intero messaggio è stato trasferito completamente** nel buffer di ricezione.
+> `MPI_Recv` **returns only when the entire message has been completely transferred** into the receive buffer.
 
-Qui la semantica è più semplice e intuitiva: se stai aspettando un messaggio, il tuo processo resta fermo (bloccato) su quella riga di codice finché il messaggio non arriva per intero. Solo dopo il ritorno di `MPI_Recv` i dati nel buffer sono validi e utilizzabili.
+Here the semantics are simpler and more intuitive: if you are waiting for a message, your process remains stopped (blocked) at that line of code until the message arrives in full. Only after `MPI_Recv` returns is the data in the buffer valid and usable.
 
-### 5.3 Riassumendo con un'analogia
+### 5.3 Summarizing with an analogy
 
-Immagina di dover spedire una lettera raccomandata:
+Imagine having to send a registered letter:
 
-* `MPI_Send` è come consegnare la lettera alle poste: una volta che l'impiegato l'ha presa in carico, puoi tornartene a casa (il tuo "buffer", cioè le tue mani, è di nuovo libero) — ma questo non significa che il destinatario l'abbia già letta.
-* `MPI_Recv` è come aspettare fisicamente davanti alla propria cassetta della posta finché la lettera non arriva: non ti muovi finché non ce l'hai in mano.
+* `MPI_Send` is like handing the letter over at the post office: once the clerk has taken charge of it, you can go back home (your "buffer", i.e. your hands, is free again) — but this does not mean the recipient has already read it.
+* `MPI_Recv` is like physically waiting in front of your own mailbox until the letter arrives: you don't move until you have it in hand.
 
-## 6. Deadlock: la trappola più comune
+## 6. Deadlock: the most common trap
 
-Un **deadlock** si verifica quando due o più processi restano bloccati indefinitamente, ciascuno in attesa di un evento che non potrà mai verificarsi perché dipende da un altro processo bloccato a sua volta.
+A **deadlock** occurs when two or more processes remain blocked indefinitely, each waiting for an event that can never happen because it depends on another process that is itself blocked.
 
-### 6.1 Lo scenario classico
+### 6.1 The classic scenario
 
-Immagina due processi che vogliono scambiarsi un valore, e **entrambi** scrivono il codice così:
+Imagine two processes that want to exchange a value, and **both** write their code like this:
 
 ```cpp
-// Processo 0                       // Processo 1
+// Process 0                         // Process 1
 MPI_Send(&a, 1, MPI_INT, 1, 0, ...);  MPI_Send(&b, 1, MPI_INT, 0, 0, ...);
 MPI_Recv(&a, 1, MPI_INT, 1, 0, ...);  MPI_Recv(&b, 1, MPI_INT, 0, 0, ...);
 ```
 
-Se, come descritto nella sezione 5.1, l'implementazione di `MPI_Send` per questo messaggio decide di **aspettare** che il receiver corrispondente sia pronto (invece di bufferizzare internamente), succede questo:
+If, as described in section 5.1, the implementation of `MPI_Send` for this message decides to **wait** for the corresponding receiver to be ready (instead of buffering internally), the following happens:
 
-* Il processo 0 esegue `MPI_Send`, e resta in attesa che il processo 1 chiami `MPI_Recv`.
-* Il processo 1, però, esegue anch'esso `MPI_Send` per primo, e resta in attesa che il processo 0 chiami `MPI_Recv`.
-* Nessuno dei due arriva mai alla propria `MPI_Recv`, perché entrambi sono bloccati sulla `MPI_Send` precedente.
+* Process 0 executes `MPI_Send`, and waits for process 1 to call `MPI_Recv`.
+* Process 1, however, also executes `MPI_Send` first, and waits for process 0 to call `MPI_Recv`.
+* Neither of the two ever reaches its own `MPI_Recv`, because both are blocked on the preceding `MPI_Send`.
 
-Risultato: **il programma si blocca per sempre** (deadlock). Da notare che questo bug può *non* manifestarsi sempre: con messaggi piccoli, il buffering interno di MPI potrebbe "salvarti" facendo tornare subito la `MPI_Send`. Questo rende il deadlock un bug particolarmente insidioso, perché può apparire solo cambiando la dimensione del messaggio, il numero di processi, o persino la macchina su cui gira il programma.
+Result: **the program hangs forever** (deadlock). Note that this bug may *not* always manifest: with small messages, MPI's internal buffering might "save you" by making `MPI_Send` return immediately. This makes deadlock a particularly insidious bug, since it can appear only when the message size, the number of processes, or even the machine the program runs on changes.
 
-### 6.2 Come evitarlo
+### 6.2 How to avoid it
 
-Alcune strategie standard:
+Some standard strategies:
 
-1. **Ordinare esplicitamente le operazioni**, ad esempio facendo sì che un processo invii prima di ricevere, e l'altro riceva prima di inviare:
+1. **Explicitly ordering the operations**, for example by having one process send before receiving, and the other receive before sending:
 
    ```cpp
-   // Processo 0                       // Processo 1
+   // Process 0                         // Process 1
    MPI_Send(&a, 1, MPI_INT, 1, 0, ...);  MPI_Recv(&b, 1, MPI_INT, 0, 0, ...);
    MPI_Recv(&a, 1, MPI_INT, 1, 0, ...);  MPI_Send(&b, 1, MPI_INT, 0, 0, ...);
    ```
 
-2. **Usare `MPI_Sendrecv`**, una funzione che combina invio e ricezione in un'unica chiamata gestita internamente da MPI in modo sicuro (non soggetta a questo tipo di deadlock), spiegata in modo esaustivo nel capitolo 3b.
+2. **Using `MPI_Sendrecv`**, a function that combines send and receive into a single call handled safely and internally by MPI (not subject to this type of deadlock), explained exhaustively in chapter 3b.
 
-3. **Usare comunicazioni non bloccanti** (`MPI_Isend`/`MPI_Irecv`), argomento del capitolo successivo.
+3. **Using non-blocking communications** (`MPI_Isend`/`MPI_Irecv`), the topic of the next chapter.
 
-L'esercizio 3 mostra concretamente questo scenario e la sua correzione.
+Exercise 3 concretely shows this scenario and its correction.
 
-## 7. MPI_Barrier: sincronizzazione collettiva bloccante
+## 7. MPI_Barrier: blocking collective synchronization
 
-Oltre alla comunicazione P2P, MPI fornisce anche operazioni bloccanti che **non** trasferiscono dati tra un mittente e un destinatario specifici, ma servono a **sincronizzare** un gruppo di processi. La più semplice è `MPI_Barrier`.
+Besides P2P communication, MPI also provides blocking operations that **do not** transfer data between a specific sender and receiver, but instead serve to **synchronize** a group of processes. The simplest one is `MPI_Barrier`.
 
 ```cpp
 MPI_Barrier(MPI_COMM_WORLD);
 ```
 
-Una barriera obbliga tutti i processi del communicator a "aspettarsi a vicenda" in quel punto del codice:
+A barrier forces all the processes in the communicator to "wait for each other" at that point in the code:
 
-* Un processo che raggiunge la barriera si ferma.
-* La chiamata ritorna **solo quando tutti** i processi del communicator hanno raggiunto la stessa barriera.
-* Nessun dato viene scambiato tra coppie specifiche di sender/receiver: è una pura sincronizzazione temporale.
+* A process that reaches the barrier stops.
+* The call returns **only when all** the processes in the communicator have reached the same barrier.
+* No data is exchanged between specific sender/receiver pairs: it is a purely temporal synchronization.
 
-Per questo motivo `MPI_Barrier` è classificata come **operazione collettiva di sincronizzazione bloccante**, e non come una primitiva di comunicazione point-to-point: non c'è un "mittente" e un "destinatario", ma l'intero gruppo che si sincronizza insieme. È utile ad esempio prima di misurare un tempo di esecuzione con `MPI_Wtime()`, per garantire che tutti i processi partano dalla stessa "linea di partenza".
+For this reason `MPI_Barrier` is classified as a **blocking collective synchronization operation**, not as a point-to-point communication primitive: there is no "sender" and "receiver", but the entire group synchronizing together. It is useful, for example, before measuring an execution time with `MPI_Wtime()`, to ensure that all processes start from the same "starting line".
 
-## 8. MPI_Status: chi mi ha scritto, cosa, quanto
+## 8. MPI_Status: who wrote to me, what, how much
 
-Quando un `MPI_Recv` accetta messaggi da **qualsiasi** mittente (`MPI_ANY_SOURCE`) o con **qualsiasi** tag (`MPI_ANY_TAG`), dopo la ricezione può essere necessario scoprire *chi ha effettivamente inviato* il messaggio e *con quale tag*. È qui che entra in gioco la struttura `MPI_Status`.
+When an `MPI_Recv` accepts messages from **any** sender (`MPI_ANY_SOURCE`) or with **any** tag (`MPI_ANY_TAG`), after receiving it may be necessary to find out *who actually sent* the message and *with which tag*. This is where the `MPI_Status` structure comes into play.
 
 ```cpp
 MPI_Status status;
 MPI_Recv(buf, count, MPI_DOUBLE, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-// Dopo la MPI_Recv, la struttura status contiene:
-status.MPI_SOURCE;  // il rank del mittente EFFETTIVO
-status.MPI_TAG;     // il tag EFFETTIVO del messaggio ricevuto
+// After MPI_Recv, the status structure contains:
+status.MPI_SOURCE;  // the rank of the ACTUAL sender
+status.MPI_TAG;     // the ACTUAL tag of the received message
 
-// Il numero di elementi ricevuti può differire dal "count" massimo passato
-// a MPI_Recv (che indicava solo la capacità del buffer): per saperlo con
-// precisione si usa MPI_Get_count:
+// The number of elements received may differ from the maximum "count" passed
+// to MPI_Recv (which only indicated the buffer's capacity): to find out
+// precisely, MPI_Get_count is used:
 int elementi_ricevuti;
 MPI_Get_count(&status, MPI_DOUBLE, &elementi_ricevuti);
 ```
 
-Se queste informazioni non servono (ad esempio perché sender e tag sono già noti e fissi), si può evitare di allocare e popolare una `MPI_Status`, passando la costante speciale `MPI_STATUS_IGNORE` al posto dell'indirizzo della struttura:
+If this information is not needed (for example because the sender and tag are already known and fixed), allocating and populating an `MPI_Status` can be avoided, by passing the special constant `MPI_STATUS_IGNORE` instead of the address of the structure:
 
 ```cpp
 MPI_Recv(buf, count, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 ```
 
-Questo evita un piccolo overhead ed è considerata buona pratica quando lo status non serve.
+This avoids a small amount of overhead and is considered good practice when the status is not needed.
 
-## 9. Esercizi guidati
+## 9. Guided exercises
 
-### Esercizio 1 — Hello con Send/Recv (`ex1_hello.cpp`)
+### Exercise 1 — Hello with Send/Recv (`ex1_hello.cpp`)
 
-Il processo 0 invia un messaggio di saluto a tutti gli altri processi, uno per uno (un `MPI_Send` per ciascun destinatario). Ogni altro processo esegue un singolo `MPI_Recv` per ricevere il proprio messaggio. Questo esercizio introduce lo schema strutturale più comune nei programmi MPI:
+Process 0 sends a greeting message to every other process, one by one (one `MPI_Send` per recipient). Every other process performs a single `MPI_Recv` to receive its own message. This exercise introduces the most common structural pattern in MPI programs:
 
 ```cpp
 if (rank == 0) {
-    // logica del mittente: un ciclo di MPI_Send verso tutti gli altri rank
+    // sender logic: a loop of MPI_Send calls to all other ranks
 } else {
-    // logica del ricevente: un solo MPI_Recv dal processo 0
+    // receiver logic: a single MPI_Recv from process 0
 }
 ```
 
-**Obiettivo:** capire come un unico eseguibile SPMD assuma ruoli diversi a seconda del rank, e come un ciclo `for` lato sender si accoppi a chiamate singole lato receiver.
+**Objective:** understand how a single SPMD executable takes on different roles depending on the rank, and how a `for` loop on the sender side pairs up with single calls on the receiver side.
 
-### Esercizio 2 — Ping-Pong (`ex2_pingpong.cpp`)
+### Exercise 2 — Ping-Pong (`ex2_pingpong.cpp`)
 
-I processi 0 e 1 si scambiano ripetutamente un valore intero: il processo 0 lo invia al processo 1, che lo incrementa e lo rimanda indietro, e così via per un numero fissato di iterazioni. Il tempo totale viene misurato con `MPI_Wtime()`, la funzione MPI per la misurazione ad alta precisione del tempo trascorso (in secondi, come `double`).
+Processes 0 and 1 repeatedly exchange an integer value: process 0 sends it to process 1, which increments it and sends it back, and so on for a fixed number of iterations. The total time is measured with `MPI_Wtime()`, the MPI function for high-precision measurement of elapsed time (in seconds, as a `double`).
 
-**Obiettivo:** introdurre la misurazione delle prestazioni di comunicazione e il concetto di **latenza** di rete: dato che in un ping-pong il messaggio percorre l'andata e il ritorno (Round-Trip Time, RTT), la latenza di un singolo invio si stima dividendo il tempo medio per iterazione per 2.
+**Objective:** introduce communication performance measurement and the concept of network **latency**: since in a ping-pong the message travels out and back (Round-Trip Time, RTT), the latency of a single send is estimated by dividing the average time per iteration by 2.
 
-### Esercizio 3 — Deadlock e come evitarlo (`ex3_deadlock.cpp`)
+### Exercise 3 — Deadlock and how to avoid it (`ex3_deadlock.cpp`)
 
-Riproduce concretamente lo scenario descritto nella sezione 6: due processi che eseguono entrambi `MPI_Send` prima di `MPI_Recv`, mostrando (o simulando, a seconda della dimensione del messaggio scelta) il rischio di stallo, seguito dalla versione corretta con l'ordine invertito su uno dei due lati.
+Concretely reproduces the scenario described in section 6: two processes both executing `MPI_Send` before `MPI_Recv`, showing (or simulating, depending on the chosen message size) the risk of a stall, followed by the corrected version with the order reversed on one of the two sides.
 
-**Obiettivo:** riconoscere sul campo un pattern di deadlock e interiorizzare le strategie di prevenzione della sezione 6.2.
+**Objective:** recognize a deadlock pattern hands-on and internalize the prevention strategies from section 6.2.
 
-### Esercizio 4 — Comunicazione ad anello (`ex4_ring.cpp`)
+### Exercise 4 — Ring communication (`ex4_ring.cpp`)
 
-Ogni processo invia un "token" (un intero) al proprio vicino successivo nell'anello, calcolato come:
+Each process sends a "token" (an integer) to its next neighbor in the ring, computed as:
 
 ```text
-rank_destinatario = (rank + 1) % size
+destination_rank = (rank + 1) % size
 ```
 
-Il processo `0` inizia inviando il token al processo `1`, ciascun processo intermedio lo riceve, lo incrementa, e lo inoltra al successivo; il token compie un giro completo e torna al processo `0`.
+Process `0` starts by sending the token to process `1`; each intermediate process receives it, increments it, and forwards it to the next one; the token completes a full loop and returns to process `0`.
 
-**Obiettivo:** applicare l'aritmetica modulare per costruire topologie di comunicazione (qui, un anello) e osservare una sequenza di comunicazioni P2P concatenate, propedeutica ai pattern collettivi più avanzati (es. `MPI_Allreduce` ad anello) trattati in guide successive.
+**Objective:** apply modular arithmetic to build communication topologies (here, a ring) and observe a sequence of chained P2P communications, laying the groundwork for the more advanced collective patterns (e.g. ring-based `MPI_Allreduce`) covered in later chapters.
 
-## 10. Output atteso e come interpretarlo
+## 10. Expected output and how to interpret it
 
-### ex1_hello (eseguito con `-np 4`)
+### ex1_hello (run with `-np 4`)
 
 ```text
 [Process 0] Greeting sent to 3 processes.
@@ -337,9 +337,9 @@ Il processo `0` inizia inviando il token al processo `1`, ciascun processo inter
 [Process 3] Message received from 0: "Hello from process 0!"
 ```
 
-Il processo 0 conferma di aver inviato 3 messaggi (uno per ciascuno degli altri rank); ognuno degli altri processi conferma di aver ricevuto il proprio messaggio, riportando esplicitamente da chi (`0`) proviene.
+Process 0 confirms that it sent 3 messages (one for each of the other ranks); each of the other processes confirms that it received its own message, explicitly reporting who it came from (`0`).
 
-### ex2_pingpong (eseguito con `-np 2`)
+### ex2_pingpong (run with `-np 2`)
 
 ```text
 [Ping-Pong] Iteration 0: value = 1 (sent from 0 to 1)
@@ -349,9 +349,9 @@ Total time for 100 ping-pongs: 0.00312 seconds
 Estimated latency (RTT/2): 15.6 microseconds
 ```
 
-Si nota come il mittente si alterni ad ogni iterazione (0→1, poi 1→0): questo è il comportamento atteso di un ping-pong. Il tempo totale e la latenza stimata dipendono fortemente dall'hardware e dall'implementazione MPI usata: valori di questo ordine di grandezza (decine di microsecondi) sono tipici per comunicazioni locali (stesso nodo).
+Notice how the sender alternates on each iteration (0→1, then 1→0): this is the expected behavior of a ping-pong. The total time and estimated latency depend heavily on the hardware and the MPI implementation used: values of this order of magnitude (tens of microseconds) are typical for local communications (same node).
 
-### ex4_ring (eseguito con `-np 4`)
+### ex4_ring (run with `-np 4`)
 
 ```text
 Process 0 sends token=0 to process 1
@@ -361,16 +361,16 @@ Process 3 receives 2, increments it to 3, sends it to process 0
 Process 0 receives final token = 3 ✓
 ```
 
-Il token parte da 0 e viene incrementato di 1 ad ogni "salto": dopo un giro completo su 4 processi, il valore finale ricevuto dal processo 0 è `3` (cioè `size - 1`), a conferma che il token ha attraversato correttamente tutti gli altri processi esattamente una volta.
+The token starts at 0 and is incremented by 1 at each "hop": after a full loop across 4 processes, the final value received by process 0 is `3` (i.e. `size - 1`), confirming that the token correctly passed through every other process exactly once.
 
-## 11. Errori comuni e come evitarli
+## 11. Common mistakes and how to avoid them
 
-| Errore | Causa tipica | Come evitarlo |
+| Mistake | Typical cause | How to avoid it |
 |---|---|---|
-| Il programma resta bloccato indefinitamente | Deadlock: `MPI_Send`/`MPI_Recv` non correttamente ordinati tra i processi (sezione 6) | Verificare che per ogni `MPI_Send` esista, in un ordine compatibile, un `MPI_Recv` corrispondente pronto ad accoglierlo |
-| Dati ricevuti sembrano "spazzatura" o troncati | `count` del receiver troppo piccolo rispetto ai dati inviati, oppure `datatype` non corrispondente tra send e recv | Assicurarsi che `datatype` combaci esattamente e che il buffer di ricezione sia sufficientemente grande; verificare con `MPI_Get_count` quanti elementi sono realmente arrivati |
-| Un `MPI_Recv` non riceve mai nulla | `source` o `tag` non corrispondono a quelli usati dal sender | Ricontrollare che rank e tag combacino, oppure usare `MPI_ANY_SOURCE`/`MPI_ANY_TAG` in fase di debug per isolare il problema |
-| Output dei processi appare "mescolato" o in ordine imprevedibile | L'ordine di stampa tra processi diversi non è garantito da MPI | Non fare affidamento sull'ordine di stampa per la correttezza logica del programma; usare `MPI_Barrier` solo per sincronizzare, non per "ordinare" l'output in modo affidabile |
-| Il programma funziona con pochi processi/dati piccoli ma si blocca con dati grandi | Comportamento di buffering interno di `MPI_Send` (sezione 5.1): con messaggi piccoli MPI bufferizza e ritorna subito, mascherando un deadlock latente | Non scrivere mai codice che assume implicitamente il buffering di `MPI_Send`; applicare sempre le strategie della sezione 6.2 |
+| The program hangs indefinitely | Deadlock: `MPI_Send`/`MPI_Recv` not correctly ordered between processes (section 6) | Verify that for every `MPI_Send` there exists, in a compatible order, a matching `MPI_Recv` ready to receive it |
+| Received data looks like "garbage" or truncated | The receiver's `count` is too small relative to the sent data, or the `datatype` does not match between send and recv | Make sure the `datatype` matches exactly and that the receive buffer is large enough; check with `MPI_Get_count` how many elements actually arrived |
+| An `MPI_Recv` never receives anything | `source` or `tag` do not match those used by the sender | Double-check that rank and tag match, or use `MPI_ANY_SOURCE`/`MPI_ANY_TAG` during debugging to isolate the problem |
+| Process output appears "mixed up" or in unpredictable order | The print order between different processes is not guaranteed by MPI | Do not rely on print order for the program's logical correctness; use `MPI_Barrier` only to synchronize, not to reliably "order" the output |
+| The program works with few processes/small data but hangs with large data | Internal buffering behavior of `MPI_Send` (section 5.1): with small messages MPI buffers and returns immediately, masking a latent deadlock | Never write code that implicitly assumes `MPI_Send` buffering; always apply the strategies from section 6.2 |
 
 ---
