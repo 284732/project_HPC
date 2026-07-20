@@ -1,4 +1,4 @@
-# Parallel Integral Estimation with MPI — Quadrature & Monte Carlo
+# Parallel Integral Estimation with MPI & Monte Carlo
 
 ## Overview
 This document describes two MPI programs that estimate the same definite integral over `[a, b]` using two different numerical strategies, with the workload distributed across multiple processes:
