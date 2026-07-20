@@ -1,88 +1,88 @@
-# 02 — Comunicazione Collettiva in MPI
+# 02 — Collective Communication in MPI
 ---
 
-## Indice
+## Table of Contents
 
-1. [Definizione e proprietà delle operazioni collettive](#1-definizione-e-proprietà-delle-operazioni-collettive)
-2. [Panoramica delle operazioni](#2-panoramica-delle-operazioni)
+1. [Definition and properties of collective operations](#1-definition-and-properties-of-collective-operations)
+2. [Overview of operations](#2-overview-of-operations)
 3. [MPI_Bcast](#3-mpi_bcast)
-4. [MPI_Scatter e MPI_Gather](#4-mpi_scatter-e-mpi_gather)
+4. [MPI_Scatter and MPI_Gather](#4-mpi_scatter-and-mpi_gather)
 5. [MPI_Allgather](#5-mpi_allgather)
-6. [MPI_Reduce e MPI_Allreduce](#6-mpi_reduce-e-mpi_allreduce)
+6. [MPI_Reduce and MPI_Allreduce](#6-mpi_reduce-and-mpi_allreduce)
 7. [MPI_Alltoall](#7-mpi_alltoall)
-8. [MPI_Barrier nel contesto delle collettive](#8-mpi_barrier-nel-contesto-delle-collettive)
-9. [MPI_IN_PLACE e gestione dei buffer](#9-mpi_in_place-e-gestione-dei-buffer)
-10. [Esercizi guidati](#10-esercizi-guidati)
-11. [Output atteso e come interpretarlo](#11-output-atteso-e-come-interpretarlo)
-12. [Errori comuni e come evitarli](#12-errori-comuni-e-come-evitarli)
+8. [MPI_Barrier in the context of collectives](#8-mpi_barrier-in-the-context-of-collectives)
+9. [MPI_IN_PLACE and buffer management](#9-mpi_in_place-and-buffer-management)
+10. [Guided exercises](#10-guided-exercises)
+11. [Expected output and how to interpret it](#11-expected-output-and-how-to-interpret-it)
+12. [Common mistakes and how to avoid them](#12-common-mistakes-and-how-to-avoid-them)
 
 ---
 
-## 1. Definizione e proprietà delle operazioni collettive
+## 1. Definition and properties of collective operations
 
-Una comunicazione **collettiva** è un'operazione a cui partecipano simultaneamente **tutti** i processi di un communicator, in contrapposizione alle operazioni point-to-point (capitoli 01a/01b), in cui la comunicazione coinvolge esattamente una coppia sender/receiver identificata esplicitamente per rank.
+A **collective** communication is an operation in which **all** the processes of a communicator participate simultaneously, as opposed to point-to-point operations (chapters 01a/01b), in which the communication involves exactly one sender/receiver pair explicitly identified by rank.
 
-Le collettive non hanno un concetto di "mittente" e "destinatario" nel senso P2P del termine: ogni processo del communicator invoca **la stessa funzione MPI**, con lo stesso `comm`, mettendo a disposizione (o richiedendo) dati secondo un pattern di comunicazione predefinito dalla semantica dell'operazione stessa (broadcast, scatter, gather, reduce, ecc.).
+Collectives have no notion of "sender" and "recipient" in the P2P sense of the term: every process in the communicator invokes **the same MPI function**, with the same `comm`, providing (or requesting) data according to a communication pattern predefined by the semantics of the operation itself (broadcast, scatter, gather, reduce, etc.).
 
-Questo comporta un vincolo stringente, da rispettare sempre:
+This entails a strict constraint that must always be respected:
 
-> ⚠️ **Regola fondamentale**: ogni processo del communicator deve invocare **la stessa funzione collettiva**, con parametri consistenti (stesso `datatype`, stesso `root` dove applicabile, count coerenti). Non esiste una nozione di "partecipazione opzionale": se anche un solo processo del communicator non effettua la chiamata corrispondente, il programma si blocca indefinitamente (gli altri processi restano in attesa di un partecipante che non arriverà mai a quel punto del codice).
+> ⚠️ **Fundamental rule**: every process in the communicator must invoke **the same collective function**, with consistent parameters (same `datatype`, same `root` where applicable, matching counts). There is no notion of "optional participation": if even a single process in the communicator does not make the corresponding call, the program hangs indefinitely (the other processes remain waiting for a participant that will never arrive at that point in the code).
 
-A differenza delle operazioni P2P bloccanti, dove il matching avviene tramite tag e rank espliciti, nelle collettive il matching è implicito: è la sequenza di chiamate collettive, nello stesso ordine su tutti i processi, a determinare quale invocazione corrisponde a quale. Chiamare collettive diverse (o la stessa collettiva con parametri strutturalmente diversi, es. datatype incompatibili) su processi diversi nello stesso "punto logico" del programma produce comportamento indefinito, spesso un deadlock o una corruzione silenziosa dei dati.
+Unlike blocking P2P operations, where matching happens through explicit tags and ranks, in collectives the matching is implicit: it is the sequence of collective calls, in the same order on all processes, that determines which invocation corresponds to which. Calling different collectives (or the same collective with structurally different parameters, e.g. incompatible datatypes) on different processes at the same "logical point" of the program produces undefined behavior, often a deadlock or silent data corruption.
 
-Va inoltre chiarito un equivoco comune: le operazioni collettive **non implicano necessariamente una sincronizzazione globale in stile `MPI_Barrier`**. Alcune implementazioni possono far ritornare una collettiva a un processo prima che tutti gli altri l'abbiano completata (dipende dall'algoritmo interno usato e dalla topologia di comunicazione). L'unica garanzia semantica è che, al ritorno della chiamata, l'effetto dell'operazione sul processo chiamante è completo e corretto (es. dopo una `MPI_Bcast`, il buffer locale contiene il dato broadcastato) — non che tutti gli altri processi abbiano già completato la propria istanza della chiamata.
+A common misconception should also be clarified: collective operations **do not necessarily imply `MPI_Barrier`-style global synchronization**. Some implementations may allow a collective to return on one process before all the others have completed it (this depends on the internal algorithm used and the communication topology). The only semantic guarantee is that, upon the call's return, the effect of the operation on the calling process is complete and correct (e.g. after an `MPI_Bcast`, the local buffer contains the broadcast data) — not that all other processes have already completed their own instance of the call.
 
-## 2. Panoramica delle operazioni
+## 2. Overview of operations
 
 ```
-MPI_Bcast      → un processo invia a tutti
-MPI_Scatter    → un processo distribuisce porzioni diverse a ciascun processo
-MPI_Gather     → tutti i processi inviano al root, che li raccoglie
-MPI_Allgather  → tutti raccolgono da tutti (equivalente a Gather + Bcast del risultato)
-MPI_Reduce     → tutti contribuiscono, il root ottiene il risultato aggregato
-MPI_Allreduce  → tutti contribuiscono, TUTTI ottengono il risultato aggregato
-MPI_Alltoall   → ogni processo invia dati diversi a ciascun altro processo (transpose)
-MPI_Barrier    → sincronizzazione pura: nessun dato scambiato, tutti attendono tutti
+MPI_Bcast      → one process sends to all
+MPI_Scatter    → one process distributes different portions to each process
+MPI_Gather     → all processes send to the root, which collects them
+MPI_Allgather  → all gather from all (equivalent to Gather + Bcast of the result)
+MPI_Reduce     → all contribute, the root obtains the aggregated result
+MPI_Allreduce  → all contribute, ALL obtain the aggregated result
+MPI_Alltoall   → each process sends different data to every other process (transpose)
+MPI_Barrier    → pure synchronization: no data exchanged, all wait for all
 ```
 
-Concettualmente queste operazioni si possono classificare per il pattern di flusso dati che implementano:
+Conceptually these operations can be classified by the data-flow pattern they implement:
 
-* **One-to-all** (distribuzione): `MPI_Bcast`, `MPI_Scatter`
-* **All-to-one** (raccolta/aggregazione): `MPI_Gather`, `MPI_Reduce`
-* **All-to-all** (scambio simmetrico): `MPI_Allgather`, `MPI_Allreduce`, `MPI_Alltoall`
-* **Sincronizzazione pura, nessun trasferimento dati**: `MPI_Barrier`
+* **One-to-all** (distribution): `MPI_Bcast`, `MPI_Scatter`
+* **All-to-one** (collection/aggregation): `MPI_Gather`, `MPI_Reduce`
+* **All-to-all** (symmetric exchange): `MPI_Allgather`, `MPI_Allreduce`, `MPI_Alltoall`
+* **Pure synchronization, no data transfer**: `MPI_Barrier`
 
 ## 3. MPI_Bcast
 
-`MPI_Bcast` replica il contenuto del buffer di un singolo processo (`root`) su tutti gli altri processi del communicator.
+`MPI_Bcast` replicates the contents of a single process's buffer (`root`) onto all the other processes of the communicator.
 
 ```
-Prima:  Proc 0 [X]  Proc 1 [?]  Proc 2 [?]  Proc 3 [?]
+Before: Proc 0 [X]  Proc 1 [?]  Proc 2 [?]  Proc 3 [?]
                         ↓
-Dopo:   Proc 0 [X]  Proc 1 [X]  Proc 2 [X]  Proc 3 [X]
+After:  Proc 0 [X]  Proc 1 [X]  Proc 2 [X]  Proc 3 [X]
 ```
 
 ```cpp
 int MPI_Bcast(
-    void*        buf,      // IN sul root, OUT su tutti gli altri: stesso
-                            // buffer usato sia per fornire che per ricevere
-                            // il dato, a seconda del rank del chiamante
-    int          count,    // numero di elementi da distribuire
+    void*        buf,      // IN on the root, OUT on all others: the same
+                            // buffer is used both to provide and to receive
+                            // the data, depending on the caller's rank
+    int          count,    // number of elements to distribute
     MPI_Datatype datatype,
-    int          root,     // rank del processo sorgente del broadcast:
-                            // deve essere IDENTICO su tutti i processi
+    int          root,     // rank of the source process of the broadcast:
+                            // must be IDENTICAL on all processes
     MPI_Comm     comm
 );
 ```
 
-Osservazioni implementative rilevanti:
+Relevant implementation notes:
 
-* Il parametro `buf` ha una semantica **dipendente dal rank del chiamante**: sul processo `root` è un buffer di **input** (contiene già il dato da distribuire), su tutti gli altri processi è un buffer di **output** (verrà scritto dalla chiamata). Non esistono due parametri distinti `sendbuf`/`recvbuf` come in altre collettive, perché il dato è identico su ogni processo al termine dell'operazione: un solo buffer è sufficiente concettualmente, anche se ogni processo lo alloca nella propria memoria privata.
-* Il valore di `root` deve essere coerente su tutti i processi chiamanti. Un valore di `root` diverso tra processi diversi produce comportamento indefinito, tipicamente un deadlock o un broadcast da una sorgente inattesa.
+* The `buf` parameter has semantics that **depend on the caller's rank**: on the `root` process it is an **input** buffer (it already contains the data to be distributed), on all other processes it is an **output** buffer (it will be written by the call). There are not two separate `sendbuf`/`recvbuf` parameters as in other collectives, because the data is identical on every process at the end of the operation: conceptually a single buffer is enough, even though each process allocates it in its own private memory.
+* The value of `root` must be consistent across all calling processes. A different `root` value on different processes produces undefined behavior, typically a deadlock or a broadcast from an unexpected source.
 
-## 4. MPI_Scatter e MPI_Gather
+## 4. MPI_Scatter and MPI_Gather
 
-Queste due operazioni sono concettualmente inverse l'una dell'altra.
+These two operations are conceptually the inverse of one another.
 
 ```
 Scatter:
@@ -92,74 +92,73 @@ Gather:
   Proc 0:[A]  Proc 1:[B]  Proc 2:[C]  Proc 3:[D]  →  Root [A B C D]
 ```
 
-`MPI_Scatter` suddivide un buffer contiguo posseduto dal root in P blocchi contigui di uguale dimensione (`sendcount` elementi ciascuno) e ne distribuisce uno per processo, nell'ordine dei rank: il blocco `i`-esimo (a partire dall'offset `i * sendcount` nel buffer del root) va al processo di rank `i`.
+`MPI_Scatter` divides a contiguous buffer owned by the root into P contiguous blocks of equal size (`sendcount` elements each) and distributes one to each process, in rank order: block `i` (starting at offset `i * sendcount` in the root's buffer) goes to the process of rank `i`.
 
-`MPI_Gather` esegue l'operazione inversa: ogni processo fornisce un blocco di `sendcount` elementi, e il root li assembla in un buffer contiguo, ordinato per rank crescente (il blocco del processo `i` finisce all'offset `i * recvcount` nel buffer del root).
+`MPI_Gather` performs the inverse operation: each process supplies a block of `sendcount` elements, and the root assembles them into a contiguous buffer, ordered by increasing rank (the block from process `i` ends up at offset `i * recvcount` in the root's buffer).
 
 ```cpp
 int MPI_Scatter(
-    const void*  sendbuf,   // significativo SOLO sul root: buffer sorgente
-                             // completo, di dimensione >= sendcount * P
-    int          sendcount, // numero di elementi INVIATI a CIASCUN processo
-                             // (non il totale!). Significativo solo sul root
-    MPI_Datatype sendtype,  // significativo solo sul root
-    void*        recvbuf,   // buffer di destinazione locale, su OGNI processo
-                             // (incluso il root, che riceve anche lui la
-                             // propria porzione tramite questo parametro)
-    int          recvcount, // numero di elementi ricevuti da QUESTO processo
+    const void*  sendbuf,   // significant ONLY on the root: complete source
+                             // buffer, of size >= sendcount * P
+    int          sendcount, // number of elements SENT to EACH process
+                             // (not the total!). Significant only on the root
+    MPI_Datatype sendtype,  // significant only on the root
+    void*        recvbuf,   // local destination buffer, on EVERY process
+                             // (including the root, which also receives its
+                             // own portion through this parameter)
+    int          recvcount, // number of elements received by THIS process
     MPI_Datatype recvtype,
-    int          root,      // deve essere identico su tutti i processi
+    int          root,      // must be identical on all processes
     MPI_Comm     comm
 );
 
 int MPI_Gather(
-    const void*  sendbuf,   // buffer locale di OGNI processo, contenente
-                             // il proprio contributo da inviare al root
-    int          sendcount, // numero di elementi inviati da QUESTO processo
+    const void*  sendbuf,   // local buffer of EVERY process, containing
+                             // its own contribution to send to the root
+    int          sendcount, // number of elements sent by THIS process
     MPI_Datatype sendtype,
-    void*        recvbuf,   // significativo SOLO sul root: buffer di
-                             // destinazione, dimensionato per contenere
-                             // recvcount * P elementi
-    int          recvcount, // numero di elementi ricevuti DA CIASCUN processo
-                             // (non il totale). Significativo solo sul root
+    void*        recvbuf,   // significant ONLY on the root: destination
+                             // buffer, sized to hold recvcount * P elements
+    int          recvcount, // number of elements received FROM EACH process
+                             // (not the total). Significant only on the root
     MPI_Datatype recvtype,
     int          root,
     MPI_Comm     comm
 );
 ```
 
-Alcuni punti tecnici da tenere presenti:
+A few technical points to keep in mind:
 
-* Nonostante `sendbuf` in `MPI_Scatter` (e `recvbuf` in `MPI_Gather`) siano parametri "significativi solo sul root", **ogni processo, incluso il non-root, deve comunque passare un valore valido** per quei parametri nella propria chiamata (tipicamente `nullptr` o un puntatore qualsiasi non dereferenziato, a seconda delle convenzioni del binding linguistico usato): il valore non verrà letto/scritto sui processi non-root, ma il parametro deve essere comunque presente nella firma della chiamata C/C++.
-* `sendcount` in `MPI_Scatter` e `recvcount` in `MPI_Gather` rappresentano la quantità di dati **per singolo processo**, non il totale aggregato: un errore comune è passare la dimensione totale del vettore invece della dimensione della singola porzione (vedi sezione 13).
-* Se il numero di elementi totali non è esattamente divisibile per il numero di processi P, `MPI_Scatter`/`MPI_Gather` "di base" non gestiscono automaticamente il resto: è necessario ricorrere alle varianti `MPI_Scatterv`/`MPI_Gatherv`, che accettano array di count e displacement per processo, permettendo blocchi di dimensione non uniforme. Queste varianti non sono trattate in questa guida introduttiva.
-* Il root, in entrambe le operazioni, partecipa anche lui come "destinatario/mittente" di una propria porzione: nella pratica il root esegue sia il ruolo di coordinatore che quello di normale partecipante, ricevendo/inviando la porzione corrispondente al proprio rank come tutti gli altri.
+* Even though `sendbuf` in `MPI_Scatter` (and `recvbuf` in `MPI_Gather`) are parameters "significant only on the root", **every process, including non-root ones, must still pass a valid value** for those parameters in its own call (typically `nullptr` or some non-dereferenced pointer, depending on the language binding conventions used): the value will not be read/written on non-root processes, but the parameter must still be present in the C/C++ call signature.
+* `sendcount` in `MPI_Scatter` and `recvcount` in `MPI_Gather` represent the amount of data **per single process**, not the aggregate total: a common mistake is to pass the total size of the vector instead of the size of the single portion (see section 13).
+* If the total number of elements is not exactly divisible by the number of processes P, the "basic" `MPI_Scatter`/`MPI_Gather` do not automatically handle the remainder: it is necessary to resort to the `MPI_Scatterv`/`MPI_Gatherv` variants, which accept per-process count and displacement arrays, allowing blocks of non-uniform size. These variants are not covered in this introductory chapter.
+* The root, in both operations, also participates as a "recipient/sender" of its own portion: in practice the root plays both the coordinator role and that of a normal participant, receiving/sending the portion corresponding to its own rank just like all the others.
 
 ## 5. MPI_Allgather
 
-`MPI_Allgather` è semanticamente equivalente a una `MPI_Gather` seguita da una `MPI_Bcast` del risultato assemblato: ogni processo fornisce un blocco, e **tutti** i processi (non solo un root) ottengono il vettore completo assemblato.
+`MPI_Allgather` is semantically equivalent to an `MPI_Gather` followed by an `MPI_Bcast` of the assembled result: each process supplies a block, and **all** processes (not just a root) obtain the complete assembled vector.
 
 ```cpp
 int MPI_Allgather(
-    const void*  sendbuf,   // buffer locale di OGNI processo
-    int          sendcount, // elementi inviati da QUESTO processo
+    const void*  sendbuf,   // local buffer of EVERY process
+    int          sendcount, // elements sent by THIS process
     MPI_Datatype sendtype,
-    void*        recvbuf,   // buffer di destinazione su OGNI processo,
-                             // dimensionato per recvcount * P elementi:
-                             // TUTTI ricevono il vettore completo
-    int          recvcount, // elementi ricevuti da CIASCUN processo
-                             // (non il totale)
+    void*        recvbuf,   // destination buffer on EVERY process,
+                             // sized for recvcount * P elements:
+                             // ALL receive the complete vector
+    int          recvcount, // elements received from EACH process
+                             // (not the total)
     MPI_Datatype recvtype,
-    MPI_Comm     comm       // nessun parametro root: non ha senso, dato
-                             // che tutti ricevono lo stesso risultato
+    MPI_Comm     comm       // no root parameter: it wouldn't make sense, since
+                             // everyone receives the same result
 );
 ```
 
-Da un punto di vista di costo computazionale/di comunicazione, `MPI_Allgather` non è semplicemente "più economica" di una Gather+Bcast eseguite in sequenza: le implementazioni MPI tipicamente usano algoritmi dedicati (ad esempio ring-based o basati su raddoppio ricorsivo, *recursive doubling*) che sfruttano la topologia di rete per ottenere un throughput aggregato superiore rispetto a due operazioni collettive separate ed eseguite in sequenza.
+From a computational/communication cost standpoint, `MPI_Allgather` is not simply "cheaper" than a Gather+Bcast performed in sequence: MPI implementations typically use dedicated algorithms (for example ring-based or recursive-doubling algorithms) that exploit the network topology to achieve higher aggregate throughput than two separate collective operations executed in sequence.
 
-## 6. MPI_Reduce e MPI_Allreduce
+## 6. MPI_Reduce and MPI_Allreduce
 
-Le operazioni di riduzione applicano un operatore associativo (e, nella maggior parte dei casi, anche commutativo) a un insieme di valori distribuiti su più processi, producendo un singolo risultato aggregato.
+Reduction operations apply an associative operator (and, in most cases, also a commutative one) to a set of values distributed across multiple processes, producing a single aggregated result.
 
 ```
 Proc 0:[2]  Proc 1:[5]  Proc 2:[3]  Proc 3:[1]
@@ -169,129 +168,129 @@ Proc 0:[2]  Proc 1:[5]  Proc 2:[3]  Proc 3:[1]
 
 ```cpp
 int MPI_Reduce(
-    const void*  sendbuf, // buffer locale di input su OGNI processo
-    void*        recvbuf, // significativo SOLO sul root: conterrà il
-                           // risultato aggregato al termine della chiamata
-    int          count,   // numero di elementi (la riduzione è applicata
-                           // elemento per elemento, se count > 1)
+    const void*  sendbuf, // local input buffer on EVERY process
+    void*        recvbuf, // significant ONLY on the root: will contain the
+                           // aggregated result at the end of the call
+    int          count,   // number of elements (the reduction is applied
+                           // element by element, if count > 1)
     MPI_Datatype datatype,
-    MPI_Op       op,       // operatore di riduzione (vedi tabella sotto)
+    MPI_Op       op,       // reduction operator (see table below)
     int          root,
     MPI_Comm     comm
 );
 
 int MPI_Allreduce(
     const void*  sendbuf,
-    void*        recvbuf, // significativo su TUTTI i processi: ciascuno
-                           // ottiene il medesimo risultato aggregato
+    void*        recvbuf, // significant on ALL processes: each one
+                           // obtains the same aggregated result
     int          count,
     MPI_Datatype datatype,
     MPI_Op       op,
-    MPI_Comm     comm      // nessun parametro root, per lo stesso motivo
-                           // visto in MPI_Allgather
+    MPI_Comm     comm      // no root parameter, for the same reason
+                           // seen in MPI_Allgather
 );
 ```
 
-**Operatori di riduzione predefiniti:**
+**Predefined reduction operators:**
 
-| Costante MPI | Operazione |
+| MPI constant | Operation |
 |---|---|
-| `MPI_SUM` | somma |
-| `MPI_PROD` | prodotto |
-| `MPI_MAX` | massimo |
-| `MPI_MIN` | minimo |
-| `MPI_LAND` | AND logico |
-| `MPI_LOR` | OR logico |
-| `MPI_BAND` | AND bit a bit |
-| `MPI_BOR` | OR bit a bit |
-| `MPI_MAXLOC` | massimo + indice del processo/posizione che lo possiede |
-| `MPI_MINLOC` | minimo + indice del processo/posizione che lo possiede |
+| `MPI_SUM` | sum |
+| `MPI_PROD` | product |
+| `MPI_MAX` | maximum |
+| `MPI_MIN` | minimum |
+| `MPI_LAND` | logical AND |
+| `MPI_LOR` | logical OR |
+| `MPI_BAND` | bitwise AND |
+| `MPI_BOR` | bitwise OR |
+| `MPI_MAXLOC` | maximum + index of the process/position that holds it |
+| `MPI_MINLOC` | minimum + index of the process/position that holds it |
 
-Note tecniche rilevanti:
+Relevant technical notes:
 
-* `MPI_MAXLOC` e `MPI_MINLOC` richiedono datatype "composti" specifici (es. `MPI_DOUBLE_INT`, `MPI_FLOAT_INT`, coppie valore-indice), non un semplice `MPI_DOUBLE`: il buffer deve contenere sia il valore che l'indice/rank associato, impacchettati secondo il layout previsto da questi datatype speciali.
-* È possibile definire operatori di riduzione **custom**, non predefiniti, tramite `MPI_Op_create`, fornendo una funzione utente che implementa la logica di combinazione. Questo esula dagli obiettivi di questa guida introduttiva, ma è utile sapere che l'insieme di operatori sopra non è esaustivo per ogni caso d'uso.
-* La standard MPI richiede che l'operatore fornito sia **associativo**; la **commutatività** non è invece un requisito rigido per gli operatori built-in elencati (che sono comunque tutti commutativi), ma diventa rilevante se si definiscono operatori custom: un operatore non commutativo può produrre risultati diversi a seconda dell'ordine con cui l'implementazione MPI combina i contributi dei vari processi, ordine che **non è specificato dallo standard** e può variare tra implementazioni o run diverse dello stesso programma.
-* `MPI_Reduce` consegna il risultato solo al root; se il risultato serve a tutti i processi (caso comune, ad esempio per un criterio di convergenza globale in un solver iterativo), usare direttamente `MPI_Allreduce` è preferibile, sia per chiarezza del codice sia per efficienza: un'implementazione naïve "Reduce + Bcast separati" richiede due passate collettive distinte, mentre `MPI_Allreduce` è tipicamente implementata con un algoritmo dedicato a costo inferiore rispetto alla somma dei costi delle due operazioni separate.
+* `MPI_MAXLOC` and `MPI_MINLOC` require specific "composite" datatypes (e.g. `MPI_DOUBLE_INT`, `MPI_FLOAT_INT`, value-index pairs), not a plain `MPI_DOUBLE`: the buffer must contain both the value and the associated index/rank, packed according to the layout expected by these special datatypes.
+* It is possible to define **custom** reduction operators, not among the predefined ones, via `MPI_Op_create`, providing a user function that implements the combination logic. This falls outside the scope of this introductory chapter, but it is useful to know that the set of operators above is not exhaustive for every use case.
+* The MPI standard requires that the operator provided be **associative**; **commutativity**, on the other hand, is not a strict requirement for the built-in operators listed (which are, in any case, all commutative), but it becomes relevant when defining custom operators: a non-commutative operator can produce different results depending on the order in which the MPI implementation combines the contributions of the various processes, an order that **is not specified by the standard** and can vary between implementations or different runs of the same program.
+* `MPI_Reduce` delivers the result only to the root; if the result is needed by all processes (a common case, for example for a global convergence criterion in an iterative solver), using `MPI_Allreduce` directly is preferable, both for code clarity and for efficiency: a naïve "separate Reduce + Bcast" implementation requires two distinct collective passes, whereas `MPI_Allreduce` is typically implemented with a dedicated algorithm whose cost is lower than the sum of the costs of the two separate operations.
 
 ## 7. MPI_Alltoall
 
-`MPI_Alltoall` è l'operazione collettiva più generale tra quelle presentate: ogni processo invia una porzione di dati **distinta** a ciascun altro processo del communicator (se stesso incluso), realizzando di fatto una trasposizione distribuita di una matrice logica P×P di blocchi, dove la riga `i` rappresenta i dati posseduti dal processo `i` da distribuire, e la colonna `j` rappresenta i dati che il processo `j` riceverà da ciascuno.
+`MPI_Alltoall` is the most general collective operation among those presented: each process sends a **distinct** portion of data to each other process in the communicator (itself included), effectively implementing a distributed transpose of a logical P×P matrix of blocks, where row `i` represents the data owned by process `i` to be distributed, and column `j` represents the data that process `j` will receive from each of the others.
 
 ```cpp
 int MPI_Alltoall(
-    const void*  sendbuf,   // buffer locale: contiene P blocchi contigui di
-                             // sendcount elementi ciascuno; il blocco j-esimo
-                             // è destinato al processo di rank j
-    int          sendcount, // elementi inviati a CIASCUN processo (non il totale)
+    const void*  sendbuf,   // local buffer: contains P contiguous blocks of
+                             // sendcount elements each; block j is destined
+                             // for the process of rank j
+    int          sendcount, // elements sent to EACH process (not the total)
     MPI_Datatype sendtype,
-    void*        recvbuf,   // buffer locale di destinazione: il blocco
-                             // ricevuto dal processo i finisce all'offset
+    void*        recvbuf,   // local destination buffer: the block
+                             // received from process i ends up at offset
                              // i * recvcount
-    int          recvcount, // elementi ricevuti DA CIASCUN processo
+    int          recvcount, // elements received FROM EACH process
     MPI_Datatype recvtype,
     MPI_Comm     comm
 );
 ```
 
-Rispetto alle altre collettive presentate, `MPI_Alltoall` non ha un pattern di comunicazione riconducibile a un albero con un singolo punto di origine o destinazione: ogni processo è simultaneamente sorgente e destinazione di P messaggi distinti (incluso, tipicamente, un messaggio "verso se stesso", gestito internamente come una semplice copia locale senza transito di rete). Il volume aggregato di dati scambiati sulla rete scala con O(P²) messaggi complessivi nel communicator, rendendo `MPI_Alltoall` l'operazione collettiva potenzialmente più costosa in termini di traffico di rete generato, specie al crescere di P.
+Compared to the other collectives presented, `MPI_Alltoall` has no communication pattern reducible to a tree with a single point of origin or destination: each process is simultaneously the source and destination of P distinct messages (typically including a message "to itself", handled internally as a simple local copy with no network transit). The aggregate volume of data exchanged over the network scales with O(P²) total messages within the communicator, making `MPI_Alltoall` the potentially most expensive collective operation in terms of network traffic generated, especially as P grows.
 
-Questo pattern è alla base di algoritmi distribuiti che richiedono una riorganizzazione globale dei dati tra processi, il caso più noto essendo la trasposizione di matrici distribuite necessaria negli algoritmi FFT (Fast Fourier Transform) distribuiti a più dimensioni, dove i dati devono essere ridistribuiti lungo un asse diverso da quello su cui erano originariamente partizionati tra i processi.
+This pattern underlies distributed algorithms that require a global reorganization of data among processes, the best-known case being the distributed matrix transposition required in multi-dimensional distributed FFT (Fast Fourier Transform) algorithms, where the data must be redistributed along a different axis from the one along which it was originally partitioned among the processes.
 
-## 8. MPI_Barrier nel contesto delle collettive
+## 8. MPI_Barrier in the context of collectives
 
-`MPI_Barrier` è già stata introdotta nella guida 01a come primitiva di sincronizzazione bloccante; qui va inquadrata correttamente come **caso particolare** di operazione collettiva: rispetta la stessa regola fondamentale (tutti i processi del communicator devono invocarla) ma, a differenza di tutte le altre collettive presentate in questo capitolo , non trasferisce alcun dato applicativo tra i processi — il suo unico effetto è garantire che nessun processo prosegua oltre la barriera finché tutti gli altri non l'hanno raggiunta.
+`MPI_Barrier` was already introduced in chapter 01a as a blocking synchronization primitive; here it should be correctly framed as a **special case** of a collective operation: it follows the same fundamental rule (every process in the communicator must invoke it) but, unlike all the other collectives presented in this chapter, it transfers no application data between processes — its sole effect is to guarantee that no process proceeds past the barrier until all the others have reached it.
 
-Va sottolineato che `MPI_Barrier` è l'**unica** collettiva per cui lo standard MPI garantisce esplicitamente una sincronizzazione temporale completa tra tutti i partecipanti al ritorno della chiamata. Come discusso nella sezione 1, per le collettive che trasferiscono dati (Bcast, Scatter, Gather, Reduce, ecc.) questa garanzia non sussiste in generale: un processo può in linea di principio ritornare dalla chiamata collettiva prima che altri processi abbiano completato la propria.
+It should be emphasized that `MPI_Barrier` is the **only** collective for which the MPI standard explicitly guarantees complete temporal synchronization among all participants upon the call's return. As discussed in section 1, for collectives that transfer data (Bcast, Scatter, Gather, Reduce, etc.) this guarantee does not hold in general: a process can, in principle, return from the collective call before other processes have completed their own.
 
-## 9. MPI_IN_PLACE e gestione dei buffer
+## 9. MPI_IN_PLACE and buffer management
 
-In diverse collettive (in particolare `MPI_Gather`, `MPI_Allgather`, `MPI_Reduce`, `MPI_Allreduce`, `MPI_Scatter`), MPI mette a disposizione la costante speciale `MPI_IN_PLACE`, utilizzabile al posto del puntatore a `sendbuf` (o, a seconda dell'operazione, `recvbuf`) per indicare che il buffer di input e di output coincidono, evitando così un'allocazione e una copia ridondante.
+In several collectives (in particular `MPI_Gather`, `MPI_Allgather`, `MPI_Reduce`, `MPI_Allreduce`, `MPI_Scatter`), MPI provides the special constant `MPI_IN_PLACE`, which can be used in place of the pointer to `sendbuf` (or, depending on the operation, `recvbuf`) to indicate that the input and output buffers coincide, thereby avoiding a redundant allocation and copy.
 
-Esempio con `MPI_Allreduce`, dove ogni processo vuole sovrascrivere il proprio buffer locale con il risultato aggregato invece di usare un buffer separato per l'output:
+Example with `MPI_Allreduce`, where each process wants to overwrite its own local buffer with the aggregated result instead of using a separate output buffer:
 
 ```cpp
 double valore = calcola_valore_locale();
 
-// Variante con buffer separati:
+// Variant with separate buffers:
 double risultato;
 MPI_Allreduce(&valore, &risultato, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-// Variante con MPI_IN_PLACE: 'valore' funge sia da input che da output
+// Variant with MPI_IN_PLACE: 'valore' acts as both input and output
 MPI_Allreduce(MPI_IN_PLACE, &valore, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 ```
 
-L'uso di `MPI_IN_PLACE` non è solo una comodità sintattica: su buffer di grandi dimensioni evita un'allocazione di memoria aggiuntiva e la copia dei dati che ne conseguirebbe, con un beneficio misurabile sia in termini di footprint di memoria che di tempo di esecuzione. La semantica esatta di `MPI_IN_PLACE` varia leggermente tra le diverse collettive (per `MPI_Gather`/`MPI_Scatter` va passato al posto del parametro relativo al processo non-root vs root, con regole specifiche caso per caso): si consiglia di consultare la documentazione della funzione specifica prima di adottarlo, poiché un uso scorretto porta tipicamente a comportamento indefinito piuttosto che a un errore di compilazione.
+The use of `MPI_IN_PLACE` is not merely a syntactic convenience: on large buffers it avoids an additional memory allocation and the resulting data copy, with a measurable benefit both in terms of memory footprint and execution time. The exact semantics of `MPI_IN_PLACE` vary slightly between the different collectives (for `MPI_Gather`/`MPI_Scatter` it must be passed in place of the parameter relating to the non-root vs. root process, with specific rules case by case): it is advisable to consult the documentation of the specific function before adopting it, since incorrect use typically leads to undefined behavior rather than a compilation error.
 
-## 10. Esercizi guidati
+## 10. Guided exercises
 
-### Esercizio 1 — Bcast e calcolo di PI (`ex1_bcast_pi.cpp`)
+### Exercise 1 — Bcast and PI computation (`ex1_bcast_pi.cpp`)
 
-Il root esegue una `MPI_Bcast` dei parametri di calcolo (in particolare il numero totale di termini della serie), dopodiché ciascun worker calcola in autonomia la propria porzione di sommatoria della serie di Leibniz per l'approssimazione di π, e infine i contributi parziali vengono aggregati con una `MPI_Reduce` (operatore `MPI_SUM`) sul root.
+The root performs an `MPI_Bcast` of the computation parameters (in particular the total number of terms in the series), after which each worker independently computes its own portion of the Leibniz series summation for the approximation of π, and finally the partial contributions are aggregated with an `MPI_Reduce` (`MPI_SUM` operator) on the root.
 
-**Obiettivo:** applicare in sequenza due pattern collettivi complementari — distribuzione dei parametri (`Bcast`) e aggregazione dei risultati (`Reduce`) — tipici della quasi totalità dei problemi di calcolo parallelo a workload embarrassingly parallel, in cui i processi lavorano su porzioni indipendenti del dominio e i risultati parziali vengono combinati a fine calcolo.
+**Objective:** apply in sequence two complementary collective patterns — distribution of parameters (`Bcast`) and aggregation of results (`Reduce`) — typical of nearly all embarrassingly parallel computing problems, in which processes work on independent portions of the domain and the partial results are combined at the end of the computation.
 
-### Esercizio 2 — Scatter/Gather: somma distribuita (`ex2_scatter_gather.cpp`)
+### Exercise 2 — Scatter/Gather: distributed sum (`ex2_scatter_gather.cpp`)
 
-Il root possiede un vettore di grandi dimensioni. Lo distribuisce con `MPI_Scatter`, ciascun worker elabora localmente la propria porzione (calcolo di una somma parziale, o trasformazione elemento per elemento, a seconda dell'implementazione specifica dell'esercizio), e i risultati vengono raccolti con `MPI_Gather` sul root per la ricomposizione finale.
+The root owns a large vector. It distributes it with `MPI_Scatter`, each worker locally processes its own portion (computing a partial sum, or an element-by-element transformation, depending on the specific implementation of the exercise), and the results are collected with `MPI_Gather` on the root for final reassembly.
 
-**Obiettivo:** gestire correttamente la relazione tra dimensione totale del dato, numero di processi e dimensione della porzione locale (`sendcount`/`recvcount` per processo, non il totale — vedi sezione 4), incluso il caso in cui la dimensione del vettore sia scelta esattamente divisibile per il numero di processi per evitare la necessità di `MPI_Scatterv`/`MPI_Gatherv`.
+**Objective:** correctly manage the relationship between the total data size, the number of processes, and the size of the local portion (`sendcount`/`recvcount` per process, not the total — see section 4), including the case where the vector size is chosen to be exactly divisible by the number of processes, to avoid the need for `MPI_Scatterv`/`MPI_Gatherv`.
 
-### Esercizio 3 — Allreduce: norma distribuita (`ex3_allreduce.cpp`)
+### Exercise 3 — Allreduce: distributed norm (`ex3_allreduce.cpp`)
 
-Ciascun processo possiede un vettore locale (una porzione di un vettore logicamente più grande, distribuito tra i processi). Si calcola la norma L2 globale del vettore completo tramite una somma dei quadrati locali seguita da una `MPI_Allreduce` con operatore `MPI_SUM`, in modo che ogni processo ottenga il risultato finale (necessario, ad esempio, per un test di convergenza locale identico su tutti i processi, senza dover ridistribuire il risultato con una `Bcast` separata).
+Each process owns a local vector (a portion of a logically larger vector, distributed among the processes). The global L2 norm of the complete vector is computed via a sum of local squares followed by an `MPI_Allreduce` with the `MPI_SUM` operator, so that every process obtains the final result (needed, for example, for a local convergence test identical across all processes, without having to redistribute the result with a separate `Bcast`).
 
-**Obiettivo:** riconoscere i casi in cui `MPI_Allreduce` è la scelta corretta rispetto a `MPI_Reduce` — ovvero quando il risultato aggregato serve a **tutti** i processi per proseguire il calcolo, non solo al root — e applicare correttamente il pattern "riduzione locale (somma dei quadrati) seguita da riduzione globale (Allreduce)" comune in molti algoritmi numerici distribuiti (calcolo di norme, prodotti scalari distribuiti, criteri di arresto in solver iterativi).
+**Objective:** recognize the cases in which `MPI_Allreduce` is the correct choice over `MPI_Reduce` — namely when the aggregated result is needed by **all** processes to continue the computation, not just by the root — and correctly apply the "local reduction (sum of squares) followed by global reduction (Allreduce)" pattern common in many distributed numerical algorithms (norm computation, distributed dot products, stopping criteria in iterative solvers).
 
-### Esercizio 4 — Alltoall: trasposizione distribuita (`ex4_alltoall.cpp`)
+### Exercise 4 — Alltoall: distributed transposition (`ex4_alltoall.cpp`)
 
-Ciascun processo invia una porzione di dati distinta a ciascun altro processo del communicator tramite `MPI_Alltoall`, realizzando una trasposizione distribuita dei dati.
+Each process sends a distinct portion of data to each other process in the communicator via `MPI_Alltoall`, implementing a distributed transposition of the data.
 
-**Obiettivo:** comprendere il pattern di comunicazione all-to-all e il suo utilizzo come blocco costruttivo fondamentale per algoritmi FFT distribuiti multi-dimensionali (dove i dati vanno periodicamente ridistribuiti lungo un asse diverso da quello di partizionamento corrente), nonché prendere consapevolezza dell'impatto sul traffico di rete generato (O(P²) messaggi nel communicator, sezione 7), rilevante nella scelta tra questo pattern e alternative basate su comunicazioni P2P mirate quando la matrice di comunicazione è sparsa (ogni processo comunica solo con un sottoinsieme degli altri, non con tutti).
+**Objective:** understand the all-to-all communication pattern and its use as a fundamental building block for multi-dimensional distributed FFT algorithms (where data must be periodically redistributed along a different axis from the current partitioning axis), as well as gaining awareness of the impact on the network traffic generated (O(P²) messages within the communicator, section 7), relevant when choosing between this pattern and alternatives based on targeted P2P communications when the communication matrix is sparse (each process communicates only with a subset of the others, not with all of them).
 
-## 11. Output atteso e come interpretarlo
+## 11. Expected output and how to interpret it
 
-### ex1_bcast_pi (eseguito con `-np 4`)
+### ex1_bcast_pi (run with `-np 4`)
 
 ```text
 [Root] N_terms = 1000000, broadcast to all.
@@ -301,16 +300,16 @@ Ciascun processo invia una porzione di dati distinta a ciascun altro processo de
 Approximated PI = 3.14159265...  (error: 9.3e-7)
 ```
 
-Il numero totale di termini (`N_terms = 1000000`) viene stampato una sola volta dal root, prima della `MPI_Bcast`: dopo la broadcast, tutti i processi possiedono lo stesso valore, ma solo il root ne dà conferma esplicita in output (evitare stampe ridondanti identiche da ogni processo è buona pratica quando l'informazione non varia tra i processi). Ogni processo elabora un intervallo contiguo e disgiunto di indici della serie (partizionamento a blocchi contigui: il processo `i` elabora l'intervallo `[i * N_terms/P, (i+1) * N_terms/P)`), coerentemente con la strategia di parallelizzazione a blocchi tipica di questo genere di calcolo. Il valore finale di π è il risultato della `MPI_Reduce` con `MPI_SUM` sulle somme parziali di ciascun processo; l'errore assoluto riportato (`9.3e-7`) è coerente con la velocità di convergenza nota della serie di Leibniz per il numero di termini scelto, e serve come controllo di correttezza numerica dell'implementazione, non solo di correttezza della comunicazione.
+The total number of terms (`N_terms = 1000000`) is printed only once by the root, before the `MPI_Bcast`: after the broadcast, all processes hold the same value, but only the root gives explicit confirmation of it in the output (avoiding identical redundant prints from every process is good practice when the information does not vary between processes). Each process handles a contiguous, disjoint range of series indices (contiguous-block partitioning: process `i` handles the range `[i * N_terms/P, (i+1) * N_terms/P)`), consistent with the block-based parallelization strategy typical of this kind of computation. The final value of π is the result of the `MPI_Reduce` with `MPI_SUM` over the partial sums of each process; the reported absolute error (`9.3e-7`) is consistent with the known convergence rate of the Leibniz series for the chosen number of terms, and serves as a check of the implementation's numerical correctness, not just of the correctness of the communication.
 
-## 12. Errori comuni e come evitarli
+## 12. Common mistakes and how to avoid them
 
-| Errore | Causa tipica | Come evitarlo |
+| Mistake | Typical cause | How to avoid it |
 |---|---|---|
-| Il programma si blocca indefinitamente su una chiamata collettiva | Un processo del communicator non raggiunge quella chiamata (es. una collettiva dentro un blocco `if` che esclude alcuni rank), oppure processi diversi invocano collettive diverse nello stesso punto logico | Ogni processo del communicator deve eseguire esattamente la stessa sequenza di chiamate collettive; non condizionare l'invocazione di una collettiva a un test sul rank, salvo il caso in cui la condizione sia strutturalmente identica su tutti i processi (es. un ciclo che tutti eseguono lo stesso numero di volte) |
-| Valore di `root` incoerente tra processi produce risultati imprevedibili o deadlock | `root` calcolato dinamicamente in modo diverso su processi diversi (es. da un valore non ancora sincronizzato) | Il valore di `root` deve essere una costante nota a priori, oppure derivare da un dato già sincronizzato in modo identico su tutti i processi prima della chiamata collettiva |
-| Dati scambiati risultano troncati, sovrapposti o in posizione sbagliata dopo `Scatter`/`Gather`/`Alltoall` | `sendcount`/`recvcount` confusi con la dimensione totale del buffer invece che con la dimensione della porzione per singolo processo (sezione 4) | Verificare sempre che `count` rappresenti la quantità **per processo**: la dimensione totale del buffer sul root deve essere `count * P`, non `count` |
-| Buffer di destinazione troppo piccolo su `MPI_Gather`/`MPI_Allgather`/`MPI_Alltoall` | Allocazione dimensionata sulla quantità di dati di un singolo processo invece che sul totale aggregato (`recvcount * P`) | Dimensionare esplicitamente i buffer di raccolta considerando il numero di processi P, non solo la dimensione del contributo locale |
-| Risultato di una riduzione (`MPI_Reduce`/`MPI_Allreduce`) leggermente diverso tra run successive dello stesso programma, con lo stesso input | Operazioni in virgola mobile non associative nella pratica (arrotondamento): l'ordine con cui l'implementazione MPI combina i contributi dei singoli processi non è specificato dallo standard e può variare tra run, algoritmi interni o numero di processi usati | Non assumere riproducibilità bit-a-bit di riduzioni floating-point tra configurazioni o run diverse; se necessaria riproducibilità stretta, valutare implementazioni di riduzione con ordine di combinazione fissato esplicitamente (fuori dallo scope di questa guida) |
-| Uso di `MPI_Reduce` quando in realtà serve il risultato su tutti i processi | Al bisogno effettivo dell'algoritmo si risponde con `Reduce` seguito da una `Bcast` manuale separata, invece che con `Allreduce` | Preferire direttamente `MPI_Allreduce` quando tutti i processi necessitano il risultato aggregato: è semanticamente equivalente ma più efficiente delle due chiamate separate (sezione 6) |
-| Comportamento indefinito o crash usando `MPI_IN_PLACE` | Uso scorretto del parametro (posizione errata, o collettiva che non supporta `MPI_IN_PLACE` nel modo assunto) | Verificare la semantica specifica di `MPI_IN_PLACE` per la collettiva in uso prima di adottarlo (sezione 10); in caso di dubbio, preferire buffer separati come impostazione di default, ottimizzando solo dove il beneficio è misurabile |
+| The program hangs indefinitely on a collective call | A process in the communicator does not reach that call (e.g. a collective inside an `if` block that excludes some ranks), or different processes invoke different collectives at the same logical point | Every process in the communicator must execute exactly the same sequence of collective calls; do not make the invocation of a collective conditional on a rank test, except when the condition is structurally identical across all processes (e.g. a loop that everyone executes the same number of times) |
+| An inconsistent `root` value between processes produces unpredictable results or a deadlock | `root` computed dynamically in different ways on different processes (e.g. from a value not yet synchronized) | The value of `root` must be a constant known in advance, or derived from data already synchronized identically across all processes before the collective call |
+| Exchanged data turns out truncated, overlapping, or in the wrong position after `Scatter`/`Gather`/`Alltoall` | `sendcount`/`recvcount` confused with the total buffer size instead of the size of the portion per single process (section 4) | Always verify that `count` represents the quantity **per process**: the total buffer size on the root must be `count * P`, not `count` |
+| Destination buffer too small on `MPI_Gather`/`MPI_Allgather`/`MPI_Alltoall` | Allocation sized on the amount of data of a single process instead of on the aggregate total (`recvcount * P`) | Explicitly size the collection buffers taking into account the number of processes P, not just the size of the local contribution |
+| The result of a reduction (`MPI_Reduce`/`MPI_Allreduce`) is slightly different between successive runs of the same program, with the same input | Floating-point operations that are not associative in practice (rounding): the order in which the MPI implementation combines the contributions of the individual processes is not specified by the standard and can vary between runs, internal algorithms, or number of processes used | Do not assume bit-for-bit reproducibility of floating-point reductions across different configurations or runs; if strict reproducibility is required, consider reduction implementations with an explicitly fixed combination order (outside the scope of this chapter) |
+| Using `MPI_Reduce` when the result is actually needed on all processes | The algorithm's actual need is met with `Reduce` followed by a separate manual `Bcast`, instead of with `Allreduce` | Prefer `MPI_Allreduce` directly when all processes need the aggregated result: it is semantically equivalent but more efficient than the two separate calls (section 6) |
+| Undefined behavior or crash when using `MPI_IN_PLACE` | Incorrect use of the parameter (wrong position, or a collective that does not support `MPI_IN_PLACE` in the assumed way) | Check the specific semantics of `MPI_IN_PLACE` for the collective in use before adopting it (section 10); when in doubt, prefer separate buffers as the default setting, optimizing only where the benefit is measurable |
