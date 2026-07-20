@@ -1,171 +1,171 @@
-# 01b — Comunicazione Point-to-Point Non Bloccante in MPI
+# 01b — Non-Blocking Point-to-Point Communication in MPI
 ---
 
-## Indice
+## Table of Contents
 
-1. [Perché esiste la comunicazione non bloccante](#1-perché-esiste-la-comunicazione-non-bloccante)
-2. [Blocking vs Non-Blocking: la differenza in una frase](#2-blocking-vs-non-blocking-la-differenza-in-una-frase)
-3. [Il pattern generale: Start → Lavoro → Wait](#3-il-pattern-generale-start--lavoro--wait)
-4. [MPI_Isend e MPI_Irecv](#4-mpi_isend-e-mpi_irecv)
-5. [MPI_Request: l'handle dell'operazione in corso](#5-mpi_request-lhandle-delloperazione-in-corso)
-6. [La regola d'oro: non toccare il buffer prima del Wait](#6-la-regola-doro-non-toccare-il-buffer-prima-del-wait)
-7. [Le funzioni di completamento: Wait, Waitall, Waitany, Test](#7-le-funzioni-di-completamento-wait-waitall-waitany-test)
-8. [Il vantaggio: sovrapposizione calcolo-comunicazione](#8-il-vantaggio-sovrapposizione-calcolo-comunicazione)
-9. [Esercizi guidati](#9-esercizi-guidati)
-10. [Output atteso e come interpretarlo](#10-output-atteso-e-come-interpretarlo)
-11. [Errori comuni e come evitarli](#11-errori-comuni-e-come-evitarli)
-12. [Confronto riassuntivo: quando usare cosa](#12-confronto-riassuntivo-quando-usare-cosa)
+1. [Why non-blocking communication exists](#1-why-non-blocking-communication-exists)
+2. [Blocking vs Non-Blocking: the difference in one sentence](#2-blocking-vs-non-blocking-the-difference-in-one-sentence)
+3. [The general pattern: Start → Work → Wait](#3-the-general-pattern-start--work--wait)
+4. [MPI_Isend and MPI_Irecv](#4-mpi_isend-and-mpi_irecv)
+5. [MPI_Request: the handle of the ongoing operation](#5-mpi_request-the-handle-of-the-ongoing-operation)
+6. [The golden rule: don't touch the buffer before Wait](#6-the-golden-rule-dont-touch-the-buffer-before-wait)
+7. [The completion functions: Wait, Waitall, Waitany, Test](#7-the-completion-functions-wait-waitall-waitany-test)
+8. [The advantage: computation-communication overlap](#8-the-advantage-computation-communication-overlap)
+9. [Guided exercises](#9-guided-exercises)
+10. [Expected output and how to interpret it](#10-expected-output-and-how-to-interpret-it)
+11. [Common mistakes and how to avoid them](#11-common-mistakes-and-how-to-avoid-them)
+12. [Summary comparison: when to use what](#12-summary-comparison-when-to-use-what)
 
 ---
 
-## 1. Perché esiste la comunicazione non bloccante
+## 1. Why non-blocking communication exists
 
-Nel capitolo precedente si nota che `MPI_Send` e `MPI_Recv` sono **bloccanti**: il processo chiamante resta fermo su quella riga di codice finché l'operazione non può considerarsi conclusa (per il send: buffer riutilizzabile; per il recv: dati arrivati per intero).
+In the previous chapter we noted that `MPI_Send` and `MPI_Recv` are **blocking**: the calling process remains stopped at that line of code until the operation can be considered complete (for send: buffer reusable; for recv: data fully arrived).
 
-Questo comportamento ha un costo evidente: mentre un processo è bloccato in attesa di completare una comunicazione, **non può fare nient'altro**. Se un processo deve inviare dati e poi eseguire un calcolo che non dipende da quei dati, con le primitive bloccanti è comunque costretto ad aspettare la fine della comunicazione prima di iniziare a calcolare, sprecando tempo prezioso.
+This behavior has an obvious cost: while a process is blocked waiting to complete a communication, **it cannot do anything else**. If a process needs to send data and then perform a computation that does not depend on that data, with blocking primitives it is nonetheless forced to wait for the communication to finish before it can start computing, wasting valuable time.
 
-La comunicazione **non bloccante** consente a un processo di iniziare un'operazione di invio o ricezione senza attendere il suo completamento. Dopo la chiamata, il processo può proseguire con altre elaborazioni. L'effettivo avanzamento della comunicazione dipende dall'implementazione MPI e può avvenire durante l'esecuzione di successive chiamate MPI o attraverso meccanismi interni della libreria. Il completamento dell'operazione viene infine verificato mediante primitive dedicate, come MPI_Wait o MPI_Test.
+**Non-blocking** communication allows a process to start a send or receive operation without waiting for its completion. After the call, the process can proceed with other work. The actual progress of the communication depends on the MPI implementation and may occur during the execution of subsequent MPI calls or through internal mechanisms of the library. The completion of the operation is ultimately verified through dedicated primitives, such as MPI_Wait or MPI_Test.
 
-## 2. Blocking vs Non-Blocking: la differenza in una frase
+## 2. Blocking vs Non-Blocking: the difference in one sentence
 
 | | Blocking (`MPI_Send`/`MPI_Recv`) | Non-Blocking (`MPI_Isend`/`MPI_Irecv`) |
 |---|---|---|
-| Quando ritorna la chiamata | Solo a operazione (parzialmente) conclusa | Immediatamente, l'operazione è solo "avviata" |
-| Il processo nel frattempo | È fermo, non fa altro | È libero di eseguire altro codice |
-| Quando i dati sono garantiti pronti | Al ritorno della funzione stessa | Solo dopo una chiamata esplicita di completamento (`MPI_Wait` e simili) |
-| Rischio principale | Deadlock (sezione 6 del capitolo Blocking) | Accesso al buffer prima del completamento (sezione 6 di questo capitolo) |
+| When the call returns | Only once the operation is (partially) complete | Immediately, the operation has only been "started" |
+| The process in the meantime | Is stopped, does nothing else | Is free to execute other code |
+| When the data is guaranteed ready | When the function itself returns | Only after an explicit completion call (`MPI_Wait` and similar) |
+| Main risk | Deadlock (section 6 of the Blocking chapter) | Accessing the buffer before completion (section 6 of this chapter) |
 
-La "I" iniziale di `MPI_Isend`/`MPI_Irecv` sta per **Immediate**: la chiamata ritorna immediatamente, senza attendere che l'operazione sia realmente conclusa.
+The initial "I" in `MPI_Isend`/`MPI_Irecv` stands for **Immediate**: the call returns immediately, without waiting for the operation to actually be completed.
 
-## 3. Il pattern generale: Start → Lavoro → Wait
+## 3. The general pattern: Start → Work → Wait
 
-Ogni comunicazione non bloccante segue sempre questa struttura in tre fasi:
+Every non-blocking communication always follows this three-phase structure:
 
 ```
-MPI_Isend / MPI_Irecv   →  avvia l'operazione (ritorna subito)
-         [lavoro utile]  →  calcola qualcosa mentre i dati sono in transito
-MPI_Wait / MPI_Waitall  →  attendi che l'operazione sia effettivamente completata
+MPI_Isend / MPI_Irecv   →  start the operation (returns immediately)
+         [useful work]  →  compute something while the data is in transit
+MPI_Wait / MPI_Waitall  →  wait until the operation is actually completed
 ```
 
-È fondamentale capire che **avviare** un'operazione non bloccante (fase 1) e **completarla** (fase 3) sono due passi distinti e obbligatori: per ogni `MPI_Isend`/`MPI_Irecv` avviato, prima o poi deve esistere una corrispondente chiamata di completamento. Omettere il completamento è un errore (vedi sezione 11).
+It is essential to understand that **starting** a non-blocking operation (phase 1) and **completing it** (phase 3) are two distinct, mandatory steps: for every `MPI_Isend`/`MPI_Irecv` started, there must sooner or later be a corresponding completion call. Omitting the completion is an error (see section 11).
 
 ```cpp
-MPI_Request request;  // handle che identifica l'operazione in corso
+MPI_Request request;  // handle identifying the operation in progress
 
-// Fase 1: avvio (non bloccante) di un invio
+// Phase 1: (non-blocking) start of a send
 MPI_Isend(buf, count, datatype, dest, tag, comm, &request);
 
-// Fase 2: lavoro utile, eseguito MENTRE la comunicazione procede
-// ... calcoli che non toccano 'buf' ...
+// Phase 2: useful work, performed WHILE the communication proceeds
+// ... computations that don't touch 'buf' ...
 
-// Fase 3: attesa esplicita del completamento
+// Phase 3: explicit wait for completion
 MPI_Wait(&request, MPI_STATUS_IGNORE);
 ```
 
-## 4. MPI_Isend e MPI_Irecv
+## 4. MPI_Isend and MPI_Irecv
 
-I prototipi di queste due funzioni sono quasi identici a quelli di `MPI_Send`/`MPI_Recv` visti nel capitolo precedente, con **due sole differenze**: non ritornano più uno stato di completamento immediato, e richiedono un parametro aggiuntivo, `MPI_Request*`.
+The prototypes of these two functions are almost identical to those of `MPI_Send`/`MPI_Recv` seen in the previous chapter, with **only two differences**: they no longer return an immediate completion status, and they require an additional parameter, `MPI_Request*`.
 
 ```cpp
 int MPI_Isend(
-    const void*  buf,      // buffer di invio: ATTENZIONE, non va modificato
-                            // finché l'operazione non è completata (sez. 6)
-    int          count,    // numero di elementi da inviare
-    MPI_Datatype datatype, // tipo MPI degli elementi (MPI_INT, MPI_DOUBLE...)
-    int          dest,     // rank del destinatario
-    int          tag,      // etichetta del messaggio
-    MPI_Comm     comm,     // communicator (es. MPI_COMM_WORLD)
-    MPI_Request* request   // OUTPUT: handle che identifica questa specifica
-                            // operazione, da usare più avanti con MPI_Wait
+    const void*  buf,      // send buffer: WARNING, must not be modified
+                            // until the operation is completed (sec. 6)
+    int          count,    // number of elements to send
+    MPI_Datatype datatype, // MPI type of the elements (MPI_INT, MPI_DOUBLE...)
+    int          dest,     // rank of the recipient
+    int          tag,      // message label
+    MPI_Comm     comm,     // communicator (e.g. MPI_COMM_WORLD)
+    MPI_Request* request   // OUTPUT: handle identifying this specific
+                            // operation, to be used later with MPI_Wait
 );
 
 int MPI_Irecv(
-    void*        buf,      // buffer di ricezione: ATTENZIONE, i dati non sono
-                            // validi finché l'operazione non è completata
-    int          count,    // capacità massima del buffer
-    MPI_Datatype datatype, // deve corrispondere al datatype del sender
-    int          source,   // rank del mittente atteso (o MPI_ANY_SOURCE)
-    int          tag,      // tag atteso (o MPI_ANY_TAG)
+    void*        buf,      // receive buffer: WARNING, the data is not
+                            // valid until the operation is completed
+    int          count,    // maximum capacity of the buffer
+    MPI_Datatype datatype, // must match the sender's datatype
+    int          source,   // rank of the expected sender (or MPI_ANY_SOURCE)
+    int          tag,      // expected tag (or MPI_ANY_TAG)
     MPI_Comm     comm,
-    MPI_Request* request   // OUTPUT: handle dell'operazione di ricezione
+    MPI_Request* request   // OUTPUT: handle of the receive operation
 );
 ```
 
-Nota che `MPI_Irecv`, a differenza di `MPI_Recv`, **non richiede** un puntatore a `MPI_Status` come ultimo parametro: le informazioni sul mittente/tag effettivi e sul numero di elementi ricevuti si ottengono passando uno `MPI_Status` alla successiva chiamata di completamento (`MPI_Wait`), non alla `MPI_Irecv` stessa — semplicemente perché al momento della `MPI_Irecv` il messaggio non è ancora arrivato, quindi quelle informazioni non esistono ancora.
+Note that `MPI_Irecv`, unlike `MPI_Recv`, **does not require** a pointer to `MPI_Status` as its last parameter: information about the actual sender/tag and the number of elements received is obtained by passing an `MPI_Status` to the subsequent completion call (`MPI_Wait`), not to `MPI_Irecv` itself — simply because at the time of the `MPI_Irecv` call the message has not yet arrived, so that information does not yet exist.
 
-## 5. MPI_Request: l'handle dell'operazione in corso
+## 5. MPI_Request: the handle of the ongoing operation
 
-`MPI_Request` è un tipo definito dallo standard MPI utilizzato per identificare e gestire un'operazione di comunicazione non bloccante. Quando una routine come `MPI_Isend()` o `MPI_Irecv()` viene invocata, la libreria MPI avvia l'operazione di comunicazione e restituisce al chiamante un oggetto di tipo `MPI_Request`, che agisce come un handle associato a tale operazione.
+`MPI_Request` is a type defined by the MPI standard, used to identify and manage a non-blocking communication operation. When a routine such as `MPI_Isend()` or `MPI_Irecv()` is invoked, the MPI library starts the communication operation and returns to the caller an object of type `MPI_Request`, which acts as a handle associated with that operation.
 
-Un oggetto `MPI_Request` non contiene i dati del messaggio né il risultato della comunicazione; esso rappresenta esclusivamente il riferimento attraverso cui MPI può identificare l'operazione avviata. Grazie a questo handle, il processo può successivamente verificare lo stato della comunicazione o attenderne il completamento mediante routine quali `MPI_Test()`, `MPI_Wait()` e le relative varianti.
+An `MPI_Request` object does not contain the message data nor the result of the communication; it represents solely the reference through which MPI can identify the operation that was started. Thanks to this handle, the process can subsequently check the status of the communication or wait for its completion using routines such as `MPI_Test()`, `MPI_Wait()`, and their related variants.
 
-La caratteristica fondamentale delle comunicazioni non bloccanti è che la chiamata a `MPI_Isend()` o `MPI_Irecv()` restituisce immediatamente il controllo al programma senza attendere il completamento effettivo del trasferimento dei dati. Ciò consente di sovrapporre attività di calcolo e comunicazione, riducendo il tempo trascorso in attesa e migliorando potenzialmente l'efficienza dell'applicazione parallela.
+The fundamental characteristic of non-blocking communications is that the call to `MPI_Isend()` or `MPI_Irecv()` immediately returns control to the program without waiting for the actual completion of the data transfer. This makes it possible to overlap computation and communication, reducing the time spent waiting and potentially improving the efficiency of the parallel application.
 
-Quando vengono avviate più operazioni non bloccanti contemporaneamente, è pratica comune memorizzare i corrispondenti handle in un array di `MPI_Request`, in cui ogni elemento identifica una specifica operazione di comunicazione. Tale struttura consente di gestire in modo efficiente l'insieme delle comunicazioni pendenti attraverso funzioni come `MPI_Waitall()`, `MPI_Testall()`, `MPI_Waitany()` e `MPI_Testany()`.
+When multiple non-blocking operations are started at the same time, it is common practice to store the corresponding handles in an array of `MPI_Request`, where each element identifies a specific communication operation. This structure makes it possible to efficiently manage the set of pending communications through functions such as `MPI_Waitall()`, `MPI_Testall()`, `MPI_Waitany()`, and `MPI_Testany()`.
 
 ```cpp
 MPI_Request requests[3];
 MPI_Isend(buf0, count, MPI_INT, dest0, tag, comm, &requests[0]);
 MPI_Isend(buf1, count, MPI_INT, dest1, tag, comm, &requests[1]);
 MPI_Isend(buf2, count, MPI_INT, dest2, tag, comm, &requests[2]);
-// ... poi si attenderanno tutte insieme con MPI_Waitall (sezione 7) ...
+// ... they will then all be waited on together with MPI_Waitall (section 7) ...
 ```
 
-## 6. La regola d'oro: non toccare il buffer prima del Wait
+## 6. The golden rule: don't touch the buffer before Wait
 
-> ⚠️Regola fondamentale
-> Tra l'avvio di una comunicazione non bloccante (`MPI_Isend` o `MPI_Irecv`) e il suo completamento mediante `MPI_Wait`, `MPI_Waitall`, `MPI_Test` o funzioni equivalenti, il buffer coinvolto nella comunicazione **non deve essere utilizzato dall'applicazione**.
+> ⚠️ Fundamental rule
+> Between the start of a non-blocking communication (`MPI_Isend` or `MPI_Irecv`) and its completion via `MPI_Wait`, `MPI_Waitall`, `MPI_Test`, or equivalent functions, the buffer involved in the communication **must not be used by the application**.
 >
-> In particolare:
+> Specifically:
 >
-> - il **buffer di invio** non deve essere modificato;
-> - il **buffer di ricezione** non deve essere letto né modificato.
+> - the **send buffer** must not be modified;
+> - the **receive buffer** must not be read or modified.
 >
-> Questa restrizione rimane valida fino a quando l'operazione di comunicazione non risulta completata.
+> This restriction remains in effect until the communication operation has been completed.
 
-## Perché questa regola è fondamentale?
+## Why is this rule fundamental?
 
-Le primitive di comunicazione non bloccante ritornano immediatamente il controllo al programma, consentendo di **sovrapporre il calcolo alla comunicazione** (*communication-computation overlap*). Tuttavia, il completamento effettivo del trasferimento dei dati può avvenire in un momento successivo e dipende dall'implementazione della libreria MPI e dallo stato della comunicazione.
+Non-blocking communication primitives immediately return control to the program, making it possible to **overlap computation and communication** (*communication-computation overlap*). However, the actual completion of the data transfer may occur at a later time and depends on the implementation of the MPI library and the state of the communication.
 
-Di conseguenza:
+As a consequence:
 
-- Se il programma modifica il **buffer di invio** prima del completamento dell'`MPI_Isend`, la libreria MPI potrebbe non aver ancora terminato di leggere tutti i dati dal buffer. Il messaggio inviato potrebbe quindi contenere dati modificati o incoerenti rispetto a quelli che si intendeva trasmettere.
+- If the program modifies the **send buffer** before the completion of the `MPI_Isend`, the MPI library may not yet have finished reading all the data from the buffer. The message sent could therefore contain data that has been modified or is inconsistent with what was intended to be transmitted.
 
-- Se il programma legge o modifica il **buffer di ricezione** prima del completamento dell'`MPI_Irecv`, il contenuto del buffer non è ancora garantito valido dallo standard MPI. I dati potrebbero non essere ancora stati ricevuti oppure essere ancora in fase di trasferimento, rendendo il contenuto del buffer **non definito**.
+- If the program reads or modifies the **receive buffer** before the completion of the `MPI_Irecv`, the contents of the buffer are not yet guaranteed to be valid according to the MPI standard. The data may not yet have been received, or may still be in the process of being transferred, making the buffer's contents **undefined**.
 
-Per questo motivo, il completamento della comunicazione tramite `MPI_Wait`, `MPI_Waitall`, `MPI_Test` o funzioni equivalenti rappresenta il punto in cui l'applicazione riacquista la piena disponibilità del buffer e può accedervi in modo sicuro.
+For this reason, the completion of the communication via `MPI_Wait`, `MPI_Waitall`, `MPI_Test`, or equivalent functions represents the point at which the application regains full availability of the buffer and can access it safely.
 
-> **Regola pratica:** dopo una chiamata a `MPI_Isend` o `MPI_Irecv`, il buffer coinvolto deve essere considerato **temporaneamente indisponibile** fino al completamento della relativa richiesta MPI. 
+> **Practical rule:** after a call to `MPI_Isend` or `MPI_Irecv`, the buffer involved must be considered **temporarily unavailable** until the completion of the related MPI request.
 
 ```cpp
 int valore = 10;
 MPI_Request req;
 MPI_Isend(&valore, 1, MPI_INT, 1, 0, MPI_COMM_WORLD, &req);
 
-valore = 20;  // ✗ ERRORE: 'valore' potrebbe essere già stato spedito
-              //   come 10, come 20, o in uno stato intermedio indefinito.
-              //   Il risultato non è garantito e dipende dai dettagli
-              //   implementativi e di timing, esattamente come un
-              //   deadlock: può "sembrare" funzionare per caso.
+valore = 20;  // ✗ ERROR: 'valore' may have already been sent
+              //   as 10, as 20, or in an undefined intermediate state.
+              //   The result is not guaranteed and depends on
+              //   implementation and timing details, exactly like a
+              //   deadlock: it may "appear" to work by chance.
 
 MPI_Wait(&req, MPI_STATUS_IGNORE);
-valore = 20;  // ✓ CORRETTO: ora l'invio è completato, il buffer è libero
+valore = 20;  // ✓ CORRECT: the send is now completed, the buffer is free
 ```
 
-Questo è l'equivalente, nel mondo non-blocking, di ciò che il deadlock rappresenta nel mondo blocking: **il rischio principale da conoscere ed evitare sempre**.
+This is the non-blocking-world equivalent of what deadlock represents in the blocking world: **the main risk to be aware of and always avoid**.
 
-## 7. Le funzioni di completamento: Wait, Waitall, Waitany, Test
+## 7. The completion functions: Wait, Waitall, Waitany, Test
 
-Avviare un'operazione non basta: prima o poi bisogna verificarne (o attenderne) il completamento. MPI mette a disposizione diverse funzioni per farlo, a seconda della situazione.
+Starting an operation is not enough: sooner or later its completion must be checked (or waited for). MPI provides several functions to do this, depending on the situation.
 
-| Funzione | Comportamento |
+| Function | Behavior |
 |---|---|
-| `MPI_Wait(&req, &status)` | **Blocca** il processo chiamante finché la specifica richiesta `req` non è completata. È l'equivalente "puntuale" di una `MPI_Recv` bloccante, ma applicato a un'operazione già avviata. |
-| `MPI_Waitall(n, reqs[], statuses[])` | **Blocca** finché **tutte** le `n` richieste nell'array `reqs[]` non sono completate. Utile quando si avviano molte comunicazioni insieme e serve solo sapere che sono *tutte* concluse, senza importare l'ordine. |
-| `MPI_Waitany(n, reqs[], &idx, &status)` | **Blocca** finché **almeno una** delle `n` richieste è completata, restituendo in `idx` l'indice di quella conclusa. Utile per reagire alla prima comunicazione che termina, processando i risultati man mano che arrivano invece di aspettare tutti insieme. |
-| `MPI_Test(&req, &flag, &status)` | **Non blocca mai**: controlla immediatamente se `req` è già completata, impostando `flag = 1` (vero) o `flag = 0` (falso), e ritorna subito in entrambi i casi. Utile per fare *polling*: "controlla se è pronto, e se non lo è continua a fare altro, poi ricontrolla più tardi". |
+| `MPI_Wait(&req, &status)` | **Blocks** the calling process until the specific request `req` is completed. It is the "pointwise" equivalent of a blocking `MPI_Recv`, but applied to an already-started operation. |
+| `MPI_Waitall(n, reqs[], statuses[])` | **Blocks** until **all** `n` requests in the array `reqs[]` are completed. Useful when many communications are started together and all you need to know is that they are *all* finished, without caring about the order. |
+| `MPI_Waitany(n, reqs[], &idx, &status)` | **Blocks** until **at least one** of the `n` requests is completed, returning in `idx` the index of the one that finished. Useful for reacting to the first communication that finishes, processing results as they arrive instead of waiting for all of them together. |
+| `MPI_Test(&req, &flag, &status)` | **Never blocks**: immediately checks whether `req` is already completed, setting `flag = 1` (true) or `flag = 0` (false), and returns immediately in both cases. Useful for *polling*: "check if it's ready, and if not keep doing other work, then check again later". |
 
-Esempio con `MPI_Waitall`, usato quando si avviano più invii contemporaneamente (come nell'Esercizio 3):
+Example with `MPI_Waitall`, used when starting several sends at the same time (as in Exercise 3):
 
 ```cpp
 MPI_Request requests[3];
@@ -175,75 +175,75 @@ for (int i = 0; i < 3; i++) {
     MPI_Isend(&dati[i], 1, MPI_INT, i + 1, 0, MPI_COMM_WORLD, &requests[i]);
 }
 
-// ... eventuale lavoro utile qui, mentre i 3 invii procedono in background ...
+// ... any useful work here, while the 3 sends proceed in the background ...
 
-MPI_Waitall(3, requests, statuses);  // aspetta che TUTTI e 3 siano completati
+MPI_Waitall(3, requests, statuses);  // wait until ALL 3 are completed
 ```
 
-Nota che `MPI_STATUS_IGNORE` (visto nel capitolo precedente) ha un equivalente per gli array: `MPI_STATUSES_IGNORE`, da usare con `MPI_Waitall` quando gli status dettagliati non servono.
+Note that `MPI_STATUS_IGNORE` (seen in the previous chapter) has an array equivalent: `MPI_STATUSES_IGNORE`, to be used with `MPI_Waitall` when detailed statuses are not needed.
 
-## 8. Il vantaggio: sovrapposizione calcolo-comunicazione
+## 8. The advantage: computation-communication overlap
 
-Il motivo principale per cui si usa la comunicazione non bloccante è la possibilità di **sovrapporre** (in inglese *overlap*) il tempo speso a comunicare con il tempo speso a calcolare, invece di sommarli in sequenza.
+The main reason non-blocking communication is used is the ability to **overlap** the time spent communicating with the time spent computing, instead of adding them up sequentially.
 
-### 8.1 Caso bloccante: tutto in sequenza
+### 8.1 Blocking case: everything in sequence
 
 ```text
-Tempo →
+Time →
 ────────────────────────────────────────────────────────
-Versione bloccante:
-|---- Send ----|---- Receive ----|---- Calcolo ----|
-Tempo totale ≈ Tsend + Trecv + Tcompute
+Blocking version:
+|---- Send ----|---- Receive ----|---- Computation ----|
+Total time ≈ Tsend + Trecv + Tcompute
 ```
 
-Con le primitive bloccanti, invio, ricezione e calcolo avvengono uno dopo l'altro: il processo è sempre impegnato in una sola attività alla volta, e il tempo totale è semplicemente la somma dei tempi di ciascuna fase.
+With blocking primitives, sending, receiving, and computing happen one after another: the process is always busy with only one activity at a time, and the total time is simply the sum of the times of each phase.
 
-### 8.2 Caso non bloccante: comunicazione e calcolo in parallelo
+### 8.2 Non-blocking case: communication and computation in parallel
 
 ```text
-Versione non bloccante:
+Non-blocking version:
 | Isend/Irecv |
-|------------- Calcolo -------------|
+|------------- Computation -------------|
                                    | Wait |
-Tempo totale ≈ max(Tcomunicazione, Tcompute) + overhead di sincronizzazione
+Total time ≈ max(Tcommunication, Tcompute) + synchronization overhead
 ```
 
-Qui l'operazione di comunicazione viene solo *avviata*, e il processo passa subito a eseguire calcolo utile mentre i dati viaggiano "in background". Il tempo di attesa finale (`MPI_Wait`) è spesso molto più breve del tempo di comunicazione totale, perché **buona parte della comunicazione si è già svolta durante il calcolo**.
+Here the communication operation is only *started*, and the process immediately moves on to performing useful computation while the data travels "in the background". The final wait time (`MPI_Wait`) is often much shorter than the total communication time, because **most of the communication has already taken place during the computation**.
 
-### 8.3 Perché funziona: due attività, non una
+### 8.3 Why it works: two activities, not one
 
-L'idea di fondo è che comunicazione (gestita in gran parte dall'hardware di rete, in modo relativamente indipendente dalla CPU) e calcolo (che invece impegna attivamente la CPU) sono due risorse **diverse**. Se un processo le usa una dopo l'altra (blocking), il tempo totale è la loro somma. Se invece riesce a farle procedere contemporaneamente (non-blocking), il tempo totale tende al **massimo** tra le due, non alla somma:
+The underlying idea is that communication (largely handled by the network hardware, relatively independently of the CPU) and computation (which instead actively occupies the CPU) are two **different** resources. If a process uses them one after the other (blocking), the total time is their sum. If instead it manages to have them proceed simultaneously (non-blocking), the total time tends toward the **maximum** of the two, not their sum:
 
 ```text
 Blocking:      Tsend + Trecv + Tcompute
-Non-blocking:  max(Tcomunicazione, Tcompute) + overhead di sincronizzazione
+Non-blocking:  max(Tcommunication, Tcompute) + synchronization overhead
 ```
 
-Il beneficio è massimo quando comunicazione e calcolo hanno **costi temporali paragonabili**: se il calcolo dura molto più a lungo della comunicazione, quest'ultima si "nasconde" quasi del tutto dietro al calcolo; se invece il calcolo è trascurabile, il vantaggio dell'overlap si riduce, perché non c'è quasi nulla con cui sovrapporre la comunicazione.
+The benefit is greatest when communication and computation have **comparable time costs**: if the computation takes much longer than the communication, the latter is almost entirely "hidden" behind the computation; if instead the computation is negligible, the benefit of overlap is reduced, because there is almost nothing to overlap the communication with.
 
-## 9. Esercizi guidati
+## 9. Guided exercises
 
-### Esercizio 1 — Isend/Irecv di base (`ex1_nonblocking_basic.cpp`)
+### Exercise 1 — Basic Isend/Irecv (`ex1_nonblocking_basic.cpp`)
 
-Reimplementazione dell'esercizio di ping-pong (già visto nella guida 01a, sezione 9, Esercizio 2) usando `MPI_Isend`/`MPI_Irecv` al posto delle versioni bloccanti.
+Reimplementation of the ping-pong exercise (already seen in chapter 01a, section 9, Exercise 2) using `MPI_Isend`/`MPI_Irecv` instead of the blocking versions.
 
-**Obiettivo:** confrontare direttamente, sullo stesso problema, la struttura del codice bloccante e non bloccante, per rendere tangibile la differenza descritta nella sezione 2 di questo capitolo (stessa logica applicativa, meccanismo di attesa completamente diverso).
+**Objective:** directly compare, on the same problem, the structure of blocking and non-blocking code, to make tangible the difference described in section 2 of this chapter (same application logic, completely different waiting mechanism).
 
-### Esercizio 2 — Overlap calcolo-comunicazione (`ex2_overlap.cpp`)
+### Exercise 2 — Computation-communication overlap (`ex2_overlap.cpp`)
 
-Ogni processo avvia un invio non bloccante dei propri dati verso un processo vicino e, mentre l'invio è in transito, calcola una somma locale su un altro insieme di dati (che non dipende da quelli in invio). Il tempo di esecuzione viene confrontato con l'equivalente versione puramente bloccante (send seguito da calcolo).
+Each process starts a non-blocking send of its own data to a neighboring process and, while the send is in transit, computes a local sum over another set of data (which does not depend on the data being sent). The execution time is compared with the equivalent purely blocking version (send followed by computation).
 
-**Obiettivo:** misurare concretamente il vantaggio descritto nella sezione 8: verificare che il tempo totale della versione non bloccante si avvicini al `max(Tcomunicazione, Tcompute)` invece che alla loro somma.
+**Objective:** concretely measure the advantage described in section 8: verify that the total time of the non-blocking version approaches `max(Tcommunication, Tcompute)` instead of their sum.
 
-### Esercizio 3 — Waitall con comunicazioni multiple (`ex3_waitall.cpp`)
+### Exercise 3 — Waitall with multiple communications (`ex3_waitall.cpp`)
 
-Il processo master avvia contemporaneamente N operazioni di `MPI_Isend` (una per ciascun worker), poi esegue del lavoro indipendente, e infine attende il completamento di tutte le comunicazioni con una singola chiamata a `MPI_Waitall`.
+The master process simultaneously starts N `MPI_Isend` operations (one per worker), then performs independent work, and finally waits for the completion of all communications with a single call to `MPI_Waitall`.
 
-**Obiettivo:** gestire un array di `MPI_Request` per operazioni multiple simultanee (sezione 5) e capire quando `MPI_Waitall` è preferibile a più chiamate separate di `MPI_Wait` in sequenza (più semplice da scrivere, e permette a MPI di completare le richieste nell'ordine più efficiente, non necessariamente quello di avvio).
+**Objective:** manage an array of `MPI_Request` for multiple simultaneous operations (section 5) and understand when `MPI_Waitall` is preferable to several separate sequential `MPI_Wait` calls (simpler to write, and it allows MPI to complete the requests in whatever order is most efficient, not necessarily the order in which they were started).
 
-## 10. Output atteso e come interpretarlo
+## 10. Expected output and how to interpret it
 
-### ex3_waitall (eseguito con `-np 4`)
+### ex3_waitall (run with `-np 4`)
 
 ```text
 [Master] Starting 3 non-blocking Isend operations...
@@ -254,24 +254,24 @@ Il processo master avvia contemporaneamente N operazioni di `MPI_Isend` (una per
 [Worker 3] Received: 300
 ```
 
-Da notare la sequenza logica delle stampe del master: prima annuncia l'avvio delle 3 `MPI_Isend` (fase 1 del pattern, sezione 3), poi stampa che sta eseguendo "altro lavoro" **prima** di aver ricevuto conferma che le comunicazioni siano concluse (fase 2, il calcolo si sovrappone alla comunicazione), e solo dopo la `MPI_Waitall` conferma che tutte e 3 sono terminate (fase 3). I tre worker, essendo processi indipendenti, possono stampare il proprio messaggio di ricezione in un ordine qualsiasi rispetto agli altri worker (l'ordine relativo tra processi diversi non è garantito, come già visto nella parte 01a), ma ciascuno riceve correttamente il valore a lui destinato (`100`, `200`, `300`).
+Note the logical sequence of the master's print statements: first it announces the start of the 3 `MPI_Isend` calls (phase 1 of the pattern, section 3), then it prints that it is doing "other work" **before** having received confirmation that the communications are finished (phase 2, computation overlaps with communication), and only after the `MPI_Waitall` does it confirm that all 3 have finished (phase 3). The three workers, being independent processes, may print their own reception message in any order relative to the other workers (the relative order between different processes is not guaranteed, as already seen in part 01a), but each correctly receives the value intended for it (`100`, `200`, `300`).
 
-## 11. Errori comuni e come evitarli
+## 11. Common mistakes and how to avoid them
 
-| Errore | Causa tipica | Come evitarlo |
+| Mistake | Typical cause | How to avoid it |
 |---|---|---|
-| Dati inviati o ricevuti risultano sbagliati, corrotti o "vecchi" | Il buffer è stato letto o scritto prima del completamento dell'operazione (violazione della regola d'oro, sezione 6) | Non accedere mai al buffer tra `MPI_Isend`/`MPI_Irecv` e il relativo `MPI_Wait`/`MPI_Waitall`; se serve un nuovo buffer per nuovi dati mentre la comunicazione precedente è ancora in corso, usarne uno diverso |
-| Il programma si blocca (o va in crash) su una `MPI_Wait` | È stata dimenticata la chiamata di completamento per una richiesta avviata, oppure si aspetta una `MPI_Request` mai inizializzata correttamente | Per ogni `MPI_Isend`/`MPI_Irecv` avviato deve sempre esistere, prima o poi, una corrispondente `MPI_Wait` (o `MPI_Waitall`/`MPI_Waitany`/`MPI_Test` fino a completamento) |
-| Perdita di memoria o comportamento indefinito nel tempo | Le `MPI_Request` non vengono mai completate, restando "appese" indefinitamente | Tracciare sempre tutte le request avviate (es. in un array) e assicurarsi che ciascuna venga completata prima della fine del programma |
-| `MPI_Test` sembra "non funzionare mai" (`flag` sempre 0) | Si controlla il completamento troppo presto rispetto ai tempi reali della rete, oppure si interpreta erroneamente `flag == 0` come errore | `flag == 0` è un esito normale e previsto di `MPI_Test`: significa semplicemente "non ancora completata", non un errore; il polling va ripetuto finché `flag` non diventa 1 |
-| Nessun guadagno di prestazioni osservato tra versione blocking e non-blocking | Il calcolo eseguito durante l'attesa (fase 2) è troppo breve rispetto al tempo di comunicazione, oppure non c'è alcun calcolo indipendente da sovrapporre | Verificare che esista un carico di lavoro reale e indipendente dai dati in transito da eseguire tra l'avvio e il completamento; l'overlap non offre benefici se non c'è nulla con cui sovrapporsi (sezione 8.3) |
+| Sent or received data turns out wrong, corrupted, or "stale" | The buffer was read or written before the operation's completion (violation of the golden rule, section 6) | Never access the buffer between `MPI_Isend`/`MPI_Irecv` and the corresponding `MPI_Wait`/`MPI_Waitall`; if a new buffer is needed for new data while the previous communication is still in progress, use a different one |
+| The program hangs (or crashes) on an `MPI_Wait` | The completion call for a started request was forgotten, or it is waiting on an `MPI_Request` that was never correctly initialized | For every `MPI_Isend`/`MPI_Irecv` started, there must always eventually be a corresponding `MPI_Wait` (or `MPI_Waitall`/`MPI_Waitany`/`MPI_Test` until completion) |
+| Memory leak or undefined behavior over time | The `MPI_Request` objects are never completed, remaining "hanging" indefinitely | Always track all started requests (e.g. in an array) and make sure each one is completed before the program ends |
+| `MPI_Test` seems to "never work" (`flag` always 0) | Completion is checked too early relative to actual network timing, or `flag == 0` is mistakenly interpreted as an error | `flag == 0` is a normal, expected outcome of `MPI_Test`: it simply means "not yet completed", not an error; polling should be repeated until `flag` becomes 1 |
+| No performance gain observed between the blocking and non-blocking versions | The computation performed during the wait (phase 2) is too short relative to the communication time, or there is no independent computation to overlap | Verify that there is a real workload, independent of the data in transit, to execute between the start and the completion; overlap offers no benefit if there is nothing to overlap it with (section 8.3) |
 
-## 12. Confronto riassuntivo: quando usare cosa
+## 12. Summary comparison: when to use what
 
-* Usa la comunicazione **bloccante** (guida 01a) quando la logica del programma è semplice, il costo di attesa non è un problema, e la priorità è la chiarezza del codice.
-* Usa la comunicazione **non bloccante** (questa guida) quando:
-  * hai calcolo utile e indipendente da eseguire mentre i dati viaggiano;
-  * devi avviare molte comunicazioni contemporaneamente e vuoi attenderle insieme in modo efficiente (`MPI_Waitall`);
-  * vuoi evitare a priori i rischi di deadlock descritti nella guida 01a, dato che `MPI_Isend`/`MPI_Irecv` non si bloccano mai in attesa di un partner pronto.
+* Use **blocking** communication (chapter 01a) when the program logic is simple, the waiting cost is not an issue, and the priority is code clarity.
+* Use **non-blocking** communication (this chapter) when:
+  * you have useful, independent computation to perform while the data travels;
+  * you need to start many communications at once and want to wait for them together efficiently (`MPI_Waitall`);
+  * you want to proactively avoid the deadlock risks described in chapter 01a, since `MPI_Isend`/`MPI_Irecv` never block waiting for a ready partner.
 
-Il prezzo da pagare per questi vantaggi è una gestione più attenta del ciclo di vita di ogni comunicazione: ricordare sempre di completare ogni operazione avviata.
+The price to pay for these advantages is more careful management of each communication's lifecycle: always remembering to complete every operation that was started.
