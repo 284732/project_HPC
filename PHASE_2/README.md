@@ -1,52 +1,52 @@
-# 📡 MPI in C++ per il Calcolo ad Alte Prestazioni
+# 📡 MPI in C++ for High Performance Computing
 
-## Panoramica
+## Overview
 
-Questa repository raccoglie una sequenza di esempi e casi di studio a difficoltà crescente sulla programmazione parallela con **MPI (Message Passing Interface)** in C++.
+This repository collects a sequence of examples and case studies of increasing difficulty on parallel programming with **MPI (Message Passing Interface)** in C++.
 
-Il materiale copre i paradigmi di comunicazione fondamentali dei sistemi a memoria distribuita, inclusa la comunicazione point-to-point (bloccante e non bloccante), la comunicazione collettiva, le topologie virtuali, le tecniche di decomposizione del dominio e l'implementazione di un solutore iterativo di Jacobi. Particolare attenzione è dedicata a concetti ricorrenti nelle applicazioni di High Performance Computing (HPC), quali halo exchange, sincronizzazione tra processi e scalabilità degli algoritmi distribuiti.
+The material covers the fundamental communication paradigms of distributed-memory systems, including point-to-point communication (blocking and non-blocking), collective communication, virtual topologies, domain decomposition techniques, and the implementation of an iterative Jacobi solver. Particular attention is devoted to concepts recurring in High Performance Computing (HPC) applications, such as halo exchange, synchronization between processes, and scalability of distributed algorithms.
 
-La repository è organizzata come una sequenza di **capitoli** tematici, ciascuno dedicato a uno specifico aspetto della programmazione MPI, corredato di note teoriche, codice sorgente commentato e output di esecuzione rappresentativi.
+The repository is organized as a sequence of thematic **chapters**, each dedicated to a specific aspect of MPI programming, accompanied by theoretical notes, commented source code, and representative execution outputs.
 
 ---
 
-## 🗂️ Struttura della repository
+## 🗂️ Repository Structure
 
 ```text
 PHASE_2/
 │
-├── 00_Intro/                    ← Scientific Computing, concetti di HPC e
-│                                  considerazioni Fortran vs C++
+├── 00_Intro/                    ← Scientific Computing, HPC concepts and
+│                                  Fortran vs C++ considerations
 │
-├── 01_Point_to_Point/           ← Comunicazione point-to-point
+├── 01_Point_to_Point/           ← Point-to-point communication
 │   ├── Blocking/                ← MPI_Send / MPI_Recv
 │   └── NonBlocking/             ← MPI_Isend / MPI_Irecv
 │
-├── 02_Collective/               ← Primitive di comunicazione collettiva
+├── 02_Collective/               ← Collective communication primitives
 │
 └── 03_Topologies/
-    ├── Jacobi/                  ← Solutore di Jacobi distribuito
-    └── Virtual_Topologies/      ← Comunicatori cartesiani e individuazione dei vicini
+    ├── Jacobi/                  ← Distributed Jacobi solver
+    └── Virtual_Topologies/      ← Cartesian communicators and neighbor discovery
 ```
 
-## 📚 Indice dei capitoli
+## 📚 Chapter Index
 
-| Capitolo | Argomento | Concetti principali |
+| Chapter | Topic | Main Concepts |
 | --- | --- | --- |
-| 00 | Introduzione | Fondamenti di HPC, Scientific Computing, confronto Fortran vs C++ |
-| 01a | Comunicazione Point-to-Point Bloccante | MPI_Send, MPI_Recv, prevenzione del deadlock, benchmark ping-pong |
-| 01b | Comunicazione Point-to-Point Non Bloccante | MPI_Isend, MPI_Irecv, MPI_Wait, MPI_Waitall, sovrapposizione calcolo-comunicazione |
-| 02 | Comunicazione Collettiva | Bcast, Scatter, Gather, Reduce, Allreduce, Alltoall |
-| 03a | Solutore di Jacobi Distribuito | Decomposizione del dominio, halo exchange, criterio di convergenza |
-| 03b | Topologie Virtuali | MPI_Cart_create, MPI_Cart_shift, MPI_Sendrecv, griglie cartesiane |
+| 00 | Introduction | HPC fundamentals, Scientific Computing, Fortran vs C++ comparison |
+| 01a | Blocking Point-to-Point Communication | MPI_Send, MPI_Recv, deadlock prevention, ping-pong benchmark |
+| 01b | Non-Blocking Point-to-Point Communication | MPI_Isend, MPI_Irecv, MPI_Wait, MPI_Waitall, computation-communication overlap |
+| 02 | Collective Communication | Bcast, Scatter, Gather, Reduce, Allreduce, Alltoall |
+| 03a | Distributed Jacobi Solver | Domain decomposition, halo exchange, convergence criterion |
+| 03b | Virtual Topologies | MPI_Cart_create, MPI_Cart_shift, MPI_Sendrecv, Cartesian grids |
 
 ---
 
-## ⚙️ Requisiti software
+## ⚙️ Software Requirements
 
-### Implementazione MPI
+### MPI Implementation
 
-Gli esempi possono essere compilati indifferentemente con MPICH oppure OpenMPI.
+The examples can be compiled indifferently with either MPICH or OpenMPI.
 
 ### Ubuntu / Debian
 
@@ -54,44 +54,44 @@ Gli esempi possono essere compilati indifferentemente con MPICH oppure OpenMPI.
 sudo apt install mpich build-essential
 ```
 
-oppure
+or
 
 ```bash
 sudo apt install libopenmpi-dev openmpi-bin
 ```
 
-Le due implementazioni sono entrambe conformi allo standard MPI e intercambiabili ai fini di questa repository; non è necessario installarle entrambe contemporaneamente, ed è sconsigliato mescolarle nello stesso ambiente di compilazione per evitare conflitti tra header e librerie di runtime.
+Both implementations are fully compliant with the MPI standard and interchangeable for the purposes of this repository; there is no need to install both at the same time, and it is not advisable to mix them within the same compilation environment, to avoid conflicts between headers and runtime libraries.
 
 ---
 
-## Compilazione
+## Compilation
 
-Template generico di compilazione:
+Generic compilation template:
 
 ```bash
 mpicxx -O2 -Wall -o program program.cpp
 ```
 
-Esempio di esecuzione:
+Execution example:
 
 ```bash
 mpirun -np 4 ./program
 ```
 
-Il wrapper del compilatore `mpicxx` fornisce automaticamente, in fase di compilazione e di linking, i percorsi di include e le librerie MPI necessarie, evitando la necessità di specificarli manualmente. Il flag `-O2` abilita un livello di ottimizzazione moderato del compilatore (bilanciato tra tempo di compilazione e prestazioni del codice generato), mentre `-Wall` attiva l'insieme standard di warning del compilatore, utile in fase di sviluppo per individuare errori comuni (variabili non inizializzate, confronti sospetti, ecc.) prima ancora dell'esecuzione.
+The `mpicxx` compiler wrapper automatically provides, at compile and link time, the necessary include paths and MPI libraries, removing the need to specify them manually. The `-O2` flag enables a moderate compiler optimization level (balanced between compilation time and the performance of the generated code), while `-Wall` activates the standard set of compiler warnings, useful during development for catching common errors (uninitialized variables, suspicious comparisons, etc.) before execution even takes place.
 
 ---
 
-## Il modello di programmazione MPI
+## The MPI Programming Model
 
-MPI segue il paradigma **SPMD (Single Program, Multiple Data)**:
+MPI follows the **SPMD (Single Program, Multiple Data)** paradigm:
 
-* Un singolo eseguibile viene lanciato su più processi.
-* Ogni processo possiede un identificatore univoco, il **rank**.
-* I processi cooperano scambiandosi messaggi tramite le routine di comunicazione MPI.
-* Ogni processo esegue lo stesso codice sorgente, ma segue percorsi di esecuzione diversi in base al proprio rank.
+* A single executable is launched across multiple processes.
+* Each process has a unique identifier, the **rank**.
+* Processes cooperate by exchanging messages through MPI communication routines.
+* Every process executes the same source code, but follows different execution paths depending on its rank.
 
-Esempio minimale:
+Minimal example:
 
 ```cpp
 #include <mpi.h>
@@ -115,13 +115,13 @@ int main(int argc, char* argv[])
 }
 ```
 
-Ogni programma MPI deve invocare `MPI_Init` prima di qualunque altra chiamata MPI (tipicamente come prima istruzione operativa di `main`, a valle della sola gestione di `argc`/`argv`) e `MPI_Finalize` come ultima chiamata MPI prima della terminazione del processo: nessuna funzione MPI, ad eccezione di un numero molto ristretto di query che lo standard esplicita separatamente, è definita al di fuori di questa finestra di inizializzazione/finalizzazione. Omettere `MPI_Finalize`, o invocare funzioni MPI dopo di essa, produce comportamento indefinito.
+Every MPI program must invoke `MPI_Init` before any other MPI call (typically as the first operational instruction in `main`, immediately after handling `argc`/`argv`) and `MPI_Finalize` as the last MPI call before the process terminates: no MPI function, with the exception of a very small number of queries explicitly specified separately by the standard, is defined outside this initialization/finalization window. Omitting `MPI_Finalize`, or invoking MPI functions after it, produces undefined behavior.
 
 ---
 
-## Datatype MPI comuni
+## Common MPI Datatypes
 
-| Tipo C++ | Datatype MPI |
+| C++ Type | MPI Datatype |
 | --- | --- |
 | int | MPI_INT |
 | double | MPI_DOUBLE |
@@ -130,33 +130,33 @@ Ogni programma MPI deve invocare `MPI_Init` prima di qualunque altra chiamata MP
 | long | MPI_LONG |
 | long long | MPI_LONG_LONG |
 
-Questa tabella copre i tipi scalari più ricorrenti nei capitoli della repository; MPI definisce un insieme più ampio di datatype predefiniti (inclusi tipi senza segno, tipi composti come `MPI_DOUBLE_INT` per le operazioni `MPI_MAXLOC`/`MPI_MINLOC` discusse nel capitolo 02, e la possibilità di costruire datatype derivati custom per strutture dati non contigue), non trattati in questa tabella riassuntiva perché non necessari alla comprensione degli esempi base.
+This table covers the scalar types most frequently used in the repository's chapters; MPI defines a broader set of predefined datatypes (including unsigned types, composite types such as `MPI_DOUBLE_INT` for the `MPI_MAXLOC`/`MPI_MINLOC` operations discussed in chapter 02, and the ability to build custom derived datatypes for non-contiguous data structures), not covered in this summary table because they are not necessary for understanding the basic examples.
 
 ---
 
-## Percorso didattico
+## Educational Path
 
-La repository segue una progressione dai meccanismi di comunicazione elementari agli algoritmi distribuiti più avanzati:
+The repository follows a progression from elementary communication mechanisms to more advanced distributed algorithms:
 
 ```text
-Introduzione (00)
+Introduction (00)
       ↓
-Point-to-Point Bloccante (01a)
+Blocking Point-to-Point (01a)
       ↓
-Point-to-Point Non Bloccante (01b)
+Non-Blocking Point-to-Point (01b)
       ↓
-Comunicazione Collettiva (02)
+Collective Communication (02)
       ↓
-Solutore di Jacobi Distribuito (03a)
+Distributed Jacobi Solver (03a)
       ↓
-Topologie Virtuali (03b)
+Virtual Topologies (03b)
 ```
 
-Da notare che, in questa sequenza, il solutore di Jacobi (03a) precede didatticamente le topologie virtuali (03b): il capitolo 03a introduce la decomposizione del dominio e l'halo exchange usando calcoli manuali dei rank dei vicini (senza topologia cartesiana), mentre il capitolo 03b mostra successivamente come le stesse operazioni di individuazione dei vicini possano essere delegate a `MPI_Cart_shift`, generalizzando il pattern di decomposizione a griglie multidimensionali. Chi affronta i due capitoli in quest'ordine osserva quindi prima il problema (gestione manuale dei vicini in una decomposizione a strisce) e poi lo strumento che ne semplifica la soluzione in casi più generali (topologia cartesiana), anziché il percorso inverso.
+Note that, in this sequence, the Jacobi solver (03a) didactically precedes virtual topologies (03b): chapter 03a introduces domain decomposition and halo exchange using manual computation of neighbor ranks (without a Cartesian topology), while chapter 03b subsequently shows how the same neighbor-discovery operations can be delegated to `MPI_Cart_shift`, generalizing the decomposition pattern to multidimensional grids. Anyone working through the two chapters in this order therefore first observes the problem (manual neighbor management in a strip decomposition) and then the tool that simplifies its solution in more general cases (Cartesian topology), rather than the reverse path.
 
-Ogni capitolo contiene:
+Each chapter contains:
 
-* Inquadramento teorico dell'argomento trattato
-* Implementazioni C++ commentate
-* Esempi di esecuzione rappresentativi, con output atteso commentato
-* Riferimenti ai concetti MPI rilevanti trattati nei capitoli precedenti, dove applicabile
+* A theoretical framing of the topic covered
+* Commented C++ implementations
+* Representative execution examples, with annotated expected output
+* References to relevant MPI concepts covered in previous chapters, where applicable
