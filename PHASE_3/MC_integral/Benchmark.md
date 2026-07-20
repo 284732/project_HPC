@@ -246,7 +246,7 @@ The commands below are necessary for creating the executable file and the execut
 # CREATION OF THE EXECUTABLE.
 mpic++ -o mc_mpi MC_MPI.cpp
 # RUN THE EXECUTABLE.
-mpirun -n 2 ./mc_mpi
+mpirun -np 2 ./mc_mpi
 ```
 
 ## Input & Output
@@ -264,8 +264,27 @@ The output data are the following (example, run with 2 processes):
 Integral estimation : 3.14169
 Computational time : 26114 ms.
 ```
-## Notes
+
+## Strong scaling
+
+In the following table are reported the Strong scaling results: Theoretical speedup, real speedup and efficiency.
+
+| N of tasks | Time [s] | Theoretical Speedup | Real Speedup | Efficiency |
+|---|---|---|---|---|
+| 1 | 160.141 | 1 | 1 | 100% |
+| 2 | 80.238 | 2 | 1.996 | 99.8% |
+| 4 | 40.418 | 4 | 3.962 | 99% |
+| 8 | 22.365 | 8 | 7.160 | 89.5% |
+| 16 | 12.745 | 16 | 12.564 | 78.5% |
+
+- Real speedup nearly matches theoretical up to 4 tasks (99.8%–99% efficiency), since each process samples independently with no communication until the final reduction.
+- From 8 tasks onward efficiency drops (89.5%, then 78.5%), as shrinking per-process workload makes fixed reduction and synchronization costs proportionally larger.
+- The 78.5% efficiency at 16 tasks suggests more sampled points would help restore efficiency by increasing local work relative to the fixed reduction overhead.
+
+## Notes `MC.cpp`
 - Being purely serial, this implementation is the natural **baseline for execution time** when comparing against a parallel (MPI) version of the same integral estimation.
-- Being a stochastic method, accuracy depends on the number of sample points `n_of_points`: increasing it reduces the statistical error but increases runtime.
 - Is chosen this kind of structure in order to allow to estimate the integral over other intervals by changing the value of `lower_bound` and `upper_bound` in the input file `input.txt`.
 
+## Notes `MC_MPI.cpp`
+- Being parallelized with MPI, this implementation is used to measure speedup and efficiency against the serial baseline `MC.cpp`, running the same estimation split across multiple processes.
+- Is chosen this kind of structure in order to allow to estimate the integral over other intervals by changing the value of `lower_bound` and `upper_bound` in the input file `input_MC_MPI.txt`.
