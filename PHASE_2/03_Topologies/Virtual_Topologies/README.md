@@ -1,163 +1,163 @@
-# 03b — Topologie Virtuali in MPI (Griglia Cartesiana)
+# 03b — Virtual Topologies in MPI (Cartesian Grid)
 
-> Capitolo di riferimento sulle topologie virtuali cartesiane in MPI. Presuppone la lettura dei capitoli precedenti (01a/01b — comunicazione point-to-point, 02 — comunicazione collettiva, 03a — solutore di Jacobi, dove `MPI_Sendrecv` e il concetto di halo exchange sono già stati introdotti in dettaglio). Qui `MPI_Sendrecv` viene riutilizzata senza essere ridefinita.
-
----
-
-## Indice
-
-1. [Cos'è una topologia virtuale e perché esiste](#1-cosè-una-topologia-virtuale-e-perché-esiste)
-2. [MPI_Cart_create: creazione della griglia cartesiana](#2-mpi_cart_create-creazione-della-griglia-cartesiana)
-3. [Corrispondenza tra rank e coordinate: ordinamento row-major](#3-corrispondenza-tra-rank-e-coordinate-ordinamento-row-major)
-4. [MPI_Cart_coords e MPI_Cart_rank](#4-mpi_cart_coords-e-mpi_cart_rank)
-5. [MPI_Cart_shift: individuazione dei vicini](#5-mpi_cart_shift-individuazione-dei-vicini)
-6. [MPI_Dims_create: bilanciamento automatico delle dimensioni](#6-mpi_dims_create-bilanciamento-automatico-delle-dimensioni)
-7. [Esercizi guidati](#7-esercizi-guidati)
-8. [Output atteso e come interpretarlo](#8-output-atteso-e-come-interpretarlo)
-9. [Errori comuni e come evitarli](#9-errori-comuni-e-come-evitarli)
+> Reference chapter on Cartesian virtual topologies in MPI. Assumes the previous chapters have been read (01a/01b — point-to-point communication, 02 — collective communication, 03a — Jacobi solver, where `MPI_Sendrecv` and the concept of halo exchange were already introduced in detail). Here `MPI_Sendrecv` is reused without being redefined.
 
 ---
 
-## 1. Cos'è una topologia virtuale e perché esiste
+## Table of Contents
 
-Una **topologia virtuale** in MPI è una struttura logica (griglia, toro, grafo generico) che viene sovrapposta all'insieme di processi di un communicator, associando a ciascun rank una posizione all'interno di questa struttura, oltre al semplice intero sequenziale `0..P-1` già disponibile in un communicator ordinario.
+1. [What a virtual topology is and why it exists](#1-what-a-virtual-topology-is-and-why-it-exists)
+2. [MPI_Cart_create: creating the Cartesian grid](#2-mpi_cart_create-creating-the-cartesian-grid)
+3. [Correspondence between rank and coordinates: row-major ordering](#3-correspondence-between-rank-and-coordinates-row-major-ordering)
+4. [MPI_Cart_coords and MPI_Cart_rank](#4-mpi_cart_coords-and-mpi_cart_rank)
+5. [MPI_Cart_shift: finding neighbors](#5-mpi_cart_shift-finding-neighbors)
+6. [MPI_Dims_create: automatic balancing of dimensions](#6-mpi_dims_create-automatic-balancing-of-dimensions)
+7. [Guided exercises](#7-guided-exercises)
+8. [Expected output and how to interpret it](#8-expected-output-and-how-to-interpret-it)
+9. [Common mistakes and how to avoid them](#9-common-mistakes-and-how-to-avoid-them)
 
-È fondamentale chiarire subito cosa una topologia virtuale **non è**: non modifica in alcun modo l'hardware fisico sottostante, non sposta processi tra nodi di calcolo, e non altera di per sé le prestazioni di comunicazione. Il termine "virtuale" è scelto proprio in contrapposizione a "fisica": la topologia è un'astrazione puramente logica, costruita sopra un communicator esistente, che semplifica il modo in cui il programmatore esprime e ragiona sulle relazioni di adiacenza tra processi.
+---
 
-I vantaggi concreti offerti da una topologia virtuale cartesiana sono tre, distinti tra loro:
+## 1. What a virtual topology is and why it exists
 
-* **Semplificazione della gestione dei vicini.** In un problema di decomposizione del dominio su griglia 2D (ad esempio una generalizzazione bidimensionale del problema di Jacobi trattato nel capitolo 04a, dove là la decomposizione era 1D a strisce), ogni processo deve individuare i rank dei propri vicini nord/sud/est/ovest. Senza topologia virtuale, questo richiede calcoli aritmetici espliciti sul rank lineare (tipicamente basati su divisioni intere e moduli) ripetuti e soggetti a errore in ogni punto del codice in cui servono; con `MPI_Cart_shift` (sezione 5), questo calcolo è delegato a una singola chiamata di libreria, con gestione automatica anche dei casi limite (bordi della griglia, periodicità).
-* **Leggibilità e manutenibilità del codice.** Esprimere la posizione di un processo come coordinate `(riga, colonna)` anziché come singolo intero rank rende il codice direttamente tracciabile rispetto alla struttura logica del problema che si sta parallelizzando, riducendo la probabilità di errori di indicizzazione nei calcoli manuali di rank dei vicini.
-* **Possibilità di ottimizzazione del mapping fisico.** Il parametro `reorder` di `MPI_Cart_create` (sezione 2) consente all'implementazione MPI di **riassegnare** i rank all'interno del nuovo communicator cartesiano, potenzialmente in modo da far coincidere la topologia logica richiesta con la topologia fisica reale dell'interconnessione di rete (ad esempio una rete a toro fisica, comune in molti sistemi HPC). Questa ottimizzazione è **facoltativa e dipendente dall'implementazione**.
+A **virtual topology** in MPI is a logical structure (grid, torus, generic graph) that is overlaid onto the set of processes of a communicator, associating each rank with a position within this structure, in addition to the simple sequential integer `0..P-1` already available in an ordinary communicator.
 
-## 2. MPI_Cart_create: creazione della griglia cartesiana
+It is essential to clarify right away what a virtual topology **is not**: it does not modify the underlying physical hardware in any way, it does not move processes between compute nodes, and it does not by itself alter communication performance. The term "virtual" is chosen precisely in contrast to "physical": the topology is a purely logical abstraction, built on top of an existing communicator, that simplifies the way the programmer expresses and reasons about adjacency relationships between processes.
+
+The concrete advantages offered by a Cartesian virtual topology are three, each distinct from the others:
+
+* **Simplified neighbor management.** In a 2D grid domain decomposition problem (for example a two-dimensional generalization of the Jacobi problem covered in chapter 04a, where the decomposition there was 1D by strips), each process must determine the ranks of its north/south/east/west neighbors. Without a virtual topology, this requires explicit arithmetic computations on the linear rank (typically based on integer division and modulo), repeated and error-prone at every point in the code where they are needed; with `MPI_Cart_shift` (section 5), this computation is delegated to a single library call, with automatic handling even of edge cases (grid boundaries, periodicity).
+* **Code readability and maintainability.** Expressing a process's position as `(row, column)` coordinates rather than as a single rank integer makes the code directly traceable to the logical structure of the problem being parallelized, reducing the likelihood of indexing errors in manual neighbor-rank computations.
+* **Potential for physical mapping optimization.** The `reorder` parameter of `MPI_Cart_create` (section 2) allows the MPI implementation to **reassign** ranks within the new Cartesian communicator, potentially in a way that makes the requested logical topology coincide with the actual physical topology of the network interconnect (for example a physical torus network, common in many HPC systems). This optimization is **optional and implementation-dependent**.
+
+## 2. MPI_Cart_create: creating the Cartesian grid
 
 ```cpp
 int MPI_Cart_create(
-    MPI_Comm  comm_old,    // communicator di partenza (tipicamente MPI_COMM_WORLD)
-                            // da cui derivare la topologia cartesiana
-    int       ndims,       // numero di dimensioni della griglia (2 per una
-                            // griglia 2D, 3 per una griglia 3D, ecc.)
-    const int dims[],      // dimensione di ciascun asse: dims[0] = numero di
-                            // righe, dims[1] = numero di colonne (per ndims=2).
-                            // Il prodotto di tutti i dims[i] NON deve superare
-                            // il numero di processi in comm_old
-    const int periods[],   // periodicità per ciascuna dimensione: periods[i]=1
-                            // rende l'asse i-esimo periodico (topologia toroidale,
-                            // il vicino "oltre" l'ultimo elemento è il primo),
-                            // periods[i]=0 rende l'asse a confine fisso (i
-                            // processi ai bordi non hanno vicino su quel lato)
-    int       reorder,     // reorder=1: l'implementazione MPI PUÒ riassegnare
-                            // i rank nel nuovo communicator per ottimizzare il
-                            // mapping fisico (sezione 1); reorder=0: i rank nel
-                            // nuovo communicator restano identici a quelli in
-                            // comm_old, nello stesso ordine
-    MPI_Comm* comm_cart    // OUTPUT: nuovo communicator con topologia cartesiana
-                            // associata, distinto da comm_old
+    MPI_Comm  comm_old,    // starting communicator (typically MPI_COMM_WORLD)
+                            // from which to derive the Cartesian topology
+    int       ndims,       // number of dimensions of the grid (2 for a
+                            // 2D grid, 3 for a 3D grid, etc.)
+    const int dims[],      // size of each axis: dims[0] = number of
+                            // rows, dims[1] = number of columns (for ndims=2).
+                            // The product of all dims[i] must NOT exceed
+                            // the number of processes in comm_old
+    const int periods[],   // periodicity for each dimension: periods[i]=1
+                            // makes the i-th axis periodic (toroidal topology,
+                            // the neighbor "beyond" the last element is the first),
+                            // periods[i]=0 makes the axis have a fixed boundary
+                            // (processes at the edges have no neighbor on that side)
+    int       reorder,     // reorder=1: the MPI implementation MAY reassign
+                            // ranks in the new communicator to optimize the
+                            // physical mapping (section 1); reorder=0: the ranks
+                            // in the new communicator remain identical to those in
+                            // comm_old, in the same order
+    MPI_Comm* comm_cart    // OUTPUT: new communicator with the associated
+                            // Cartesian topology, distinct from comm_old
 );
 ```
 
-Alcune precisazioni tecniche rilevanti, spesso fonte di errore per chi usa questa funzione per la prima volta:
+Some relevant technical clarifications, often a source of errors for those using this function for the first time:
 
-* Se il prodotto `dims[0] × dims[1] × ... × dims[ndims-1]` è **strettamente minore** del numero di processi disponibili in `comm_old`, i processi "in eccesso" (quelli il cui rank originale non trova posto nella griglia) ricevono `MPI_COMM_NULL` come valore di `comm_cart` e non partecipano alla topologia risultante: è responsabilità del programmatore verificare che il numero di processi lanciati corrisponda esattamente (o sia gestito esplicitamente per il caso di eccesso) al prodotto delle dimensioni richieste.
-* Se il prodotto delle dimensioni **eccede** il numero di processi disponibili, la chiamata è un errore MPI (tipicamente terminazione del programma con codice di errore, a seconda della gestione degli errori configurata).
-* `MPI_Cart_create` è essa stessa una **operazione collettiva** (implicitamente, per la natura di come i communicator vengono costruiti in MPI): deve essere invocata da tutti i processi di `comm_old`, con argomenti `ndims`, `dims[]` e `periods[]` consistenti su tutti i chiamanti, per lo stesso motivo di consistenza discusso per le collettive generiche nel capitolo 02(sezione 1).
-* Il communicator `comm_cart` restituito è un nuovo communicator, **distinto** da `comm_old`: le operazioni di comunicazione (P2P o collettive) successive vanno indirizzate a `comm_cart` se si desidera operare all'interno del gruppo di processi della griglia (che coincide con quello di `comm_old` a meno del caso di eccesso di processi discusso sopra), mentre `comm_old` resta comunque valido e utilizzabile indipendentemente.
+* If the product `dims[0] × dims[1] × ... × dims[ndims-1]` is **strictly less than** the number of processes available in `comm_old`, the "excess" processes (those whose original rank finds no place in the grid) receive `MPI_COMM_NULL` as the value of `comm_cart` and do not participate in the resulting topology: it is the programmer's responsibility to verify that the number of launched processes matches exactly (or is explicitly handled for the excess case) the product of the requested dimensions.
+* If the product of the dimensions **exceeds** the number of available processes, the call is an MPI error (typically resulting in program termination with an error code, depending on the configured error handling).
+* `MPI_Cart_create` is itself a **collective operation** (implicitly, given the way communicators are constructed in MPI): it must be invoked by all the processes in `comm_old`, with `ndims`, `dims[]`, and `periods[]` arguments consistent across all callers, for the same consistency reason discussed for generic collectives in chapter 02 (section 1).
+* The returned `comm_cart` communicator is a new communicator, **distinct** from `comm_old`: subsequent communication operations (P2P or collective) must be addressed to `comm_cart` if one wishes to operate within the grid's group of processes (which coincides with that of `comm_old` except for the excess-process case discussed above), while `comm_old` remains valid and independently usable.
 
-## 3. Corrispondenza tra rank e coordinate: ordinamento row-major
+## 3. Correspondence between rank and coordinates: row-major ordering
 
-Quando `MPI_Cart_create` costruisce la griglia (con `reorder=0`, il caso più semplice da ragionare esplicitamente), assegna alle coordinate cartesiane un ordinamento **row-major** rispetto al rank lineare originale: il rank cresce scorrendo prima lungo l'ultima dimensione (le colonne, per una griglia 2D), e solo al termine di ogni riga passa alla riga successiva — esattamente la stessa convenzione di memorizzazione row-major usata per gli array multidimensionali in C/C++.
+When `MPI_Cart_create` builds the grid (with `reorder=0`, the simplest case to reason about explicitly), it assigns the Cartesian coordinates a **row-major** ordering relative to the original linear rank: the rank increases by first moving along the last dimension (the columns, for a 2D grid), and only moves to the next row once each row is finished — exactly the same row-major storage convention used for multidimensional arrays in C/C++.
 
-Per una griglia 4×3 (`dims = {4, 3}`, quindi 4 righe e 3 colonne, per un totale di 12 processi), la corrispondenza tra rank lineare e coordinate `(riga, colonna)` è:
+For a 4×3 grid (`dims = {4, 3}`, i.e. 4 rows and 3 columns, for a total of 12 processes), the correspondence between the linear rank and the `(row, column)` coordinates is:
 
 ```
              col 0      col 1      col 2
-riga 0   [P0 (0,0)] [P1 (0,1)] [P2 (0,2)]
-riga 1   [P3 (1,0)] [P4 (1,1)] [P5 (1,2)]
-riga 2   [P6 (2,0)] [P7 (2,1)] [P8 (2,2)]
-riga 3   [P9 (3,0)] [P10(3,1)] [P11(3,2)]
+row 0    [P0 (0,0)] [P1 (0,1)] [P2 (0,2)]
+row 1    [P3 (1,0)] [P4 (1,1)] [P5 (1,2)]
+row 2    [P6 (2,0)] [P7 (2,1)] [P8 (2,2)]
+row 3    [P9 (3,0)] [P10(3,1)] [P11(3,2)]
 ```
 
-La relazione generale, per una griglia con `dims[1]` colonne, è:
+The general relationship, for a grid with `dims[1]` columns, is:
 
 ```
 rank = coords[0] * dims[1] + coords[1]
 ```
 
-ossia esattamente la formula di linearizzazione di un array 2D memorizzato in ordine row-major, dove `coords[0]` è l'indice di riga e `coords[1]` l'indice di colonna. Questa relazione è quella implementata internamente da `MPI_Cart_rank` (conversione coordinate → rank) e dalla sua inversa da `MPI_Cart_coords` (rank → coordinate), descritte nella sezione seguente. Va sottolineato che questa corrispondenza esplicita vale quando `reorder=0`: con `reorder=1`, l'implementazione MPI può assegnare i rank nella griglia secondo un ordine diverso (dipendente dall'implementazione, orientato all'ottimizzazione del mapping fisico discussa in sezione 1), e il programmatore non deve fare affidamento su un ordinamento row-major esplicito basato sul rank originale in quel caso — deve invece sempre interrogare `MPI_Cart_coords`/`MPI_Cart_rank` per ottenere la corrispondenza effettiva, piuttosto che calcolarla manualmente.
+which is exactly the linearization formula for a 2D array stored in row-major order, where `coords[0]` is the row index and `coords[1]` is the column index. This relationship is the one implemented internally by `MPI_Cart_rank` (coordinates → rank conversion) and its inverse by `MPI_Cart_coords` (rank → coordinates), described in the following section. It should be emphasized that this explicit correspondence holds when `reorder=0`: with `reorder=1`, the MPI implementation may assign ranks in the grid according to a different order (implementation-dependent, oriented toward the physical mapping optimization discussed in section 1), and in that case the programmer must not rely on an explicit row-major ordering based on the original rank — instead, `MPI_Cart_coords`/`MPI_Cart_rank` must always be queried to obtain the actual correspondence, rather than computing it manually.
 
-## 4. MPI_Cart_coords e MPI_Cart_rank
+## 4. MPI_Cart_coords and MPI_Cart_rank
 
-Queste due funzioni sono l'una l'inversa dell'altra, e permettono di convertire tra la rappresentazione "rank lineare" e la rappresentazione "coordinate cartesiane" di un processo all'interno della topologia.
+These two functions are the inverse of one another, and allow conversion between the "linear rank" representation and the "Cartesian coordinates" representation of a process within the topology.
 
 ```cpp
 int MPI_Cart_coords(
-    MPI_Comm comm_cart,  // il communicator con topologia cartesiana
-    int      rank,       // il rank (in comm_cart) di cui si vogliono le coordinate
-    int      ndims,      // numero di dimensioni della griglia (deve corrispondere
-                          // a quello usato in MPI_Cart_create)
-    int      coords[]    // OUTPUT: array di ndims interi, riempito con le
-                          // coordinate del processo di rank specificato
+    MPI_Comm comm_cart,  // the communicator with the Cartesian topology
+    int      rank,       // the rank (in comm_cart) whose coordinates are wanted
+    int      ndims,      // number of dimensions of the grid (must match
+                          // the one used in MPI_Cart_create)
+    int      coords[]    // OUTPUT: array of ndims integers, filled with the
+                          // coordinates of the process with the specified rank
 );
 
 int MPI_Cart_rank(
-    MPI_Comm comm_cart,   // il communicator con topologia cartesiana
-    const int coords[],   // le coordinate di cui si vuole il rank corrispondente
-    int*     rank         // OUTPUT: il rank corrispondente a quelle coordinate
+    MPI_Comm comm_cart,   // the communicator with the Cartesian topology
+    const int coords[],   // the coordinates whose corresponding rank is wanted
+    int*     rank         // OUTPUT: the rank corresponding to those coordinates
 );
 ```
 
-Un uso tipico è ottenere le proprie coordinate a inizio programma, immediatamente dopo la creazione della topologia:
+A typical use is to obtain one's own coordinates at the start of the program, immediately after creating the topology:
 
 ```cpp
 int rank, coords[2];
-MPI_Comm_rank(comm_cart, &rank);           // rank di QUESTO processo in comm_cart
-MPI_Cart_coords(comm_cart, rank, 2, coords); // le proprie coordinate (riga, colonna)
+MPI_Comm_rank(comm_cart, &rank);           // rank of THIS process in comm_cart
+MPI_Cart_coords(comm_cart, rank, 2, coords); // its own coordinates (row, column)
 ```
 
-Da notare che `MPI_Cart_coords` accetta come parametro un rank **arbitrario**, non necessariamente quello del processo chiamante: è quindi possibile, da un qualunque processo, interrogare le coordinate di un altro processo di cui si conosce il rank, utile ad esempio per scopi diagnostici o di logging centralizzato. Analogamente, `MPI_Cart_rank` può essere invocata per determinare il rank corrispondente a coordinate arbitrarie, anche non corrispondenti al processo chiamante — operazione particolarmente utile quando si deve indirizzare esplicitamente una comunicazione verso un processo identificato per posizione logica nella griglia piuttosto che per rank, ad esempio "il processo nell'angolo opposto della griglia" o "il processo nella stessa colonna ma riga 0".
+Note that `MPI_Cart_coords` accepts an **arbitrary** rank as a parameter, not necessarily that of the calling process: it is therefore possible, from any process, to query the coordinates of another process whose rank is known, useful for example for diagnostic or centralized logging purposes. Similarly, `MPI_Cart_rank` can be invoked to determine the rank corresponding to arbitrary coordinates, even ones not corresponding to the calling process — an operation particularly useful when a communication needs to be explicitly addressed to a process identified by its logical position in the grid rather than by rank, for example "the process in the opposite corner of the grid" or "the process in the same column but row 0".
 
-## 5. MPI_Cart_shift: individuazione dei vicini
+## 5. MPI_Cart_shift: finding neighbors
 
-`MPI_Cart_shift` è la funzione centrale per la gestione dei vicini in una topologia cartesiana: calcola, per il processo chiamante, i rank dei vicini lungo una specifica dimensione e in entrambe le direzioni (avanti e indietro) rispetto a quella dimensione, in un'unica chiamata.
+`MPI_Cart_shift` is the central function for neighbor management in a Cartesian topology: for the calling process, it computes the ranks of the neighbors along a specific dimension and in both directions (forward and backward) relative to that dimension, in a single call.
 
 ```cpp
 int MPI_Cart_shift(
-    MPI_Comm comm_cart,        // il communicator con topologia cartesiana
-    int      direction,        // l'asse lungo cui cercare i vicini:
-                                // 0 → verticale (lungo le righe, quindi
-                                //     variando coords[0]),
-                                // 1 → orizzontale (lungo le colonne, quindi
-                                //     variando coords[1])
-    int      disp,             // spostamento (displacement) da applicare:
-                                // disp=+1 → vicino "in avanti" lungo l'asse
-                                //     (coordinata incrementata di 1),
-                                // disp=-1 → vicino "all'indietro" lungo l'asse
-                                //     (coordinata decrementata di 1).
-                                // Valori |disp|>1 sono ammessi dallo standard
-                                // e restituiscono il vicino a distanza disp,
-                                // ma l'uso più comune è ±1 per i vicini immediati
-    int*     rank_source,      // OUTPUT: il rank del processo da cui QUESTO
-                                // processo riceverebbe, se effettuasse uno
-                                // spostamento nella direzione OPPOSTA a disp
-                                // (utile passandolo direttamente come 'source'
-                                // di una successiva MPI_Sendrecv)
-    int*     rank_destination  // OUTPUT: il rank del processo verso cui QUESTO
-                                // processo invierebbe, spostandosi nella
-                                // direzione indicata da disp (utile come
-                                // 'dest' di una MPI_Sendrecv)
+    MPI_Comm comm_cart,        // the communicator with the Cartesian topology
+    int      direction,        // the axis along which to look for neighbors:
+                                // 0 → vertical (along the rows, i.e.
+                                //     varying coords[0]),
+                                // 1 → horizontal (along the columns, i.e.
+                                //     varying coords[1])
+    int      disp,             // displacement to apply:
+                                // disp=+1 → "forward" neighbor along the axis
+                                //     (coordinate incremented by 1),
+                                // disp=-1 → "backward" neighbor along the axis
+                                //     (coordinate decremented by 1).
+                                // Values |disp|>1 are allowed by the standard
+                                // and return the neighbor at distance disp,
+                                // but the most common use is ±1 for immediate neighbors
+    int*     rank_source,      // OUTPUT: the rank of the process from which THIS
+                                // process would receive, if it performed a
+                                // shift in the direction OPPOSITE to disp
+                                // (useful to pass directly as 'source'
+                                // in a subsequent MPI_Sendrecv)
+    int*     rank_destination  // OUTPUT: the rank of the process to which THIS
+                                // process would send, by shifting in the
+                                // direction indicated by disp (useful as
+                                // 'dest' in an MPI_Sendrecv)
 );
 ```
 
-Il punto concettualmente più delicato di questa funzione, spesso frainteso, è la relazione tra `disp` e i due output `rank_source`/`rank_destination`: **non** restituiscono semplicemente "il vicino avanti" e "il vicino indietro" in modo simmetrico e indipendente, ma sono pensati esplicitamente per essere passati **direttamente** come parametri `source` e `dest` di una singola chiamata `MPI_Sendrecv` (capitolo 03a, sezione 2.5), realizzando in un solo passo uno scambio di dati bidirezionale lungo quella direzione:
+The conceptually trickiest point of this function, often misunderstood, is the relationship between `disp` and the two outputs `rank_source`/`rank_destination`: they do **not** simply return "the forward neighbor" and "the backward neighbor" symmetrically and independently, but are explicitly designed to be passed **directly** as the `source` and `dest` parameters of a single `MPI_Sendrecv` call (chapter 03a, section 2.5), achieving a bidirectional data exchange along that direction in a single step:
 
 ```cpp
 int rank_source, rank_dest;
 MPI_Cart_shift(comm_cart, /*direction=*/0, /*disp=*/+1, &rank_source, &rank_dest);
 
-// rank_dest   = il vicino a cui inviare i miei dati (un passo avanti, disp=+1)
-// rank_source = il vicino da cui ricevere dati (un passo indietro rispetto a me,
-//               ovvero il processo per cui IO sono il vicino "avanti")
+// rank_dest   = the neighbor to send my data to (one step forward, disp=+1)
+// rank_source = the neighbor to receive data from (one step backward relative to me,
+//               i.e. the process for which I AM the "forward" neighbor)
 
 MPI_Sendrecv(
     my_data, count, MPI_DOUBLE, rank_dest,   TAG,
@@ -166,13 +166,13 @@ MPI_Sendrecv(
 );
 ```
 
-Per ottenere sia il vicino nord che il vicino sud (o est/ovest) di un processo, sono quindi necessarie **due chiamate distinte** a `MPI_Cart_shift`, una con `disp=+1` e una con `disp=-1` sulla stessa `direction`, esattamente come nella tabella di esempio della sezione successiva.
+To obtain both the north and south neighbor (or east/west) of a process, **two separate calls** to `MPI_Cart_shift` are therefore needed, one with `disp=+1` and one with `disp=-1` on the same `direction`, exactly as in the example table in the next section.
 
-**Comportamento ai bordi della griglia.** Se `periods[direction]=0` (asse non periodico) e lo spostamento richiesto porterebbe fuori dai limiti della griglia (ad esempio, chiedere il vicino "a nord" per un processo già sulla prima riga), la funzione non genera un errore: restituisce la costante speciale `MPI_PROC_NULL` per l'output corrispondente. Come già accennato nel capitolo 03a (sezione 2.5), `MPI_PROC_NULL` è un rank "fittizio" verso cui/da cui ogni operazione di comunicazione MPI (incluso `MPI_Sendrecv`) è garantita dallo standard essere un no-op immediato, senza necessità di logica condizionale esplicita nel codice applicativo per gestire il caso di bordo. Se invece `periods[direction]=1` (asse periodico), lo spostamento "avvolge" automaticamente attorno alla griglia (topologia toroidale): il vicino "a nord" del processo sulla prima riga è il processo sull'ultima riga della stessa colonna, e la funzione restituisce quel rank invece di `MPI_PROC_NULL`.
+**Behavior at the grid boundaries.** If `periods[direction]=0` (non-periodic axis) and the requested shift would go beyond the limits of the grid (for example, asking for the "north" neighbor of a process already on the first row), the function does not raise an error: it returns the special constant `MPI_PROC_NULL` for the corresponding output. As already mentioned in chapter 03a (section 2.5), `MPI_PROC_NULL` is a "dummy" rank to/from which every MPI communication operation (including `MPI_Sendrecv`) is guaranteed by the standard to be an immediate no-op, eliminating the need for explicit conditional logic in the application code to handle the boundary case. If instead `periods[direction]=1` (periodic axis), the shift automatically "wraps around" the grid (toroidal topology): the "north" neighbor of the process on the first row is the process on the last row of the same column, and the function returns that rank instead of `MPI_PROC_NULL`.
 
-### Esempio: i quattro vicini del processo P4 in una griglia 4×3
+### Example: the four neighbors of process P4 in a 4×3 grid
 
-Per il processo di rank 4, coordinate `(1,1)`, nella griglia 4×3 di sezione 3:
+For the process of rank 4, coordinates `(1,1)`, in the 4×3 grid from section 3:
 
 ```
 NORTH (direction=0, disp=-1): P1  (rank=1, coords=(0,1))
@@ -181,77 +181,77 @@ WEST  (direction=1, disp=-1): P3  (rank=3, coords=(1,0))
 EAST  (direction=1, disp=+1): P5  (rank=5, coords=(1,2))
 ```
 
-Da notare la corrispondenza: `direction=0` agisce sulla prima coordinata (`coords[0]`, la riga), quindi produce vicini in direzione verticale (nord/sud); `direction=1` agisce sulla seconda coordinata (`coords[1]`, la colonna), producendo vicini in direzione orizzontale (est/ovest). Questa corrispondenza `direction ↔ asse geometrico` è una convenzione applicativa (nord/sud/est/ovest sono etichette scelte dal programmatore in base a come interpreta le due dimensioni della griglia), non un vincolo imposto dallo standard MPI, che tratta `direction` semplicemente come indice di una delle `ndims` dimensioni astratte della griglia.
+Note the correspondence: `direction=0` acts on the first coordinate (`coords[0]`, the row), thus producing neighbors in the vertical direction (north/south); `direction=1` acts on the second coordinate (`coords[1]`, the column), producing neighbors in the horizontal direction (east/west). This `direction ↔ geometric axis` correspondence is an application-level convention (north/south/east/west are labels chosen by the programmer based on how they interpret the grid's two dimensions), not a constraint imposed by the MPI standard, which treats `direction` simply as the index of one of the grid's `ndims` abstract dimensions.
 
-## 6. MPI_Dims_create: bilanciamento automatico delle dimensioni
+## 6. MPI_Dims_create: automatic balancing of dimensions
 
-Scegliere manualmente `dims[]` per `MPI_Cart_create` richiede di conoscere a priori una fattorizzazione del numero di processi P che produca una griglia ragionevolmente bilanciata. `MPI_Dims_create` automatizza questa scelta:
+Manually choosing `dims[]` for `MPI_Cart_create` requires knowing in advance a factorization of the number of processes P that produces a reasonably balanced grid. `MPI_Dims_create` automates this choice:
 
 ```cpp
 int MPI_Dims_create(
-    int nnodes,   // numero totale di processi da disporre nella griglia
-                   // (tipicamente il size del communicator di partenza)
-    int ndims,    // numero di dimensioni della griglia desiderata
-    int dims[]    // INPUT/OUTPUT: le dimensioni già FISSATE dal chiamante
-                   // (valore diverso da 0) vengono rispettate e non alterate;
-                   // le dimensioni lasciate a 0 dal chiamante vengono calcolate
-                   // automaticamente da MPI, in modo che il prodotto finale di
-                   // tutti i dims[i] sia esattamente pari a nnodes
+    int nnodes,   // total number of processes to arrange in the grid
+                   // (typically the size of the starting communicator)
+    int ndims,    // number of dimensions of the desired grid
+    int dims[]    // INPUT/OUTPUT: the dimensions already FIXED by the caller
+                   // (value other than 0) are respected and not altered;
+                   // the dimensions left at 0 by the caller are computed
+                   // automatically by MPI, so that the final product of
+                   // all dims[i] equals exactly nnodes
 );
 ```
 
-La funzione tenta di produrre dimensioni il più possibile **equilibrate tra loro**, un obiettivo motivato dal fatto che, a parità di numero totale di processi, una griglia "quadrata" (o quasi) minimizza tipicamente il rapporto superficie/volume dei sottodomini in una decomposizione spaziale 2D, riducendo il volume di comunicazione di halo exchange per unità di lavoro computazionale rispetto a una griglia fortemente "allungata" (ad esempio 1×P, che degenera di fatto in una decomposizione 1D a strisce come quella della guida 03a).
+The function attempts to produce dimensions that are as **balanced as possible relative to one another**, a goal motivated by the fact that, for the same total number of processes, a "square" (or near-square) grid typically minimizes the surface/volume ratio of the subdomains in a 2D spatial decomposition, reducing the halo-exchange communication volume per unit of computational work compared to a heavily "elongated" grid (for example 1×P, which effectively degenerates into a 1D strip decomposition like the one in chapter 03a).
 
-Esempio d'uso, con entrambe le dimensioni lasciate libere (`dims[] = {0, 0}` in ingresso):
+Example usage, with both dimensions left free (`dims[] = {0, 0}` as input):
 
 ```cpp
 int size;
 MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-int dims[2] = {0, 0};        // entrambe le dimensioni da determinare automaticamente
+int dims[2] = {0, 0};        // both dimensions to be determined automatically
 MPI_Dims_create(size, 2, dims);
-// Per size=12: dims diventa {4,3} oppure {3,4} (a seconda della strategia di
-// fattorizzazione interna dell'implementazione), non {12,1} né {1,12},
-// poiché 4×3 è la fattorizzazione più bilanciata di 12 in due fattori
+// For size=12: dims becomes {4,3} or {3,4} (depending on the implementation's
+// internal factorization strategy), not {12,1} nor {1,12},
+// since 4×3 is the most balanced factorization of 12 into two factors
 
 MPI_Comm comm_cart;
 int periods[2] = {0, 0};
 MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, &comm_cart);
 ```
 
-È anche possibile **vincolare** esplicitamente una sola dimensione e lasciare che `MPI_Dims_create` determini l'altra, impostando a un valore diverso da zero solo la componente che si vuole fissare:
+It is also possible to explicitly **constrain** only one dimension and let `MPI_Dims_create` determine the other, by setting to a non-zero value only the component that is to be fixed:
 
 ```cpp
-int dims[2] = {2, 0};  // vincola esplicitamente 2 righe, lascia libere le colonne
+int dims[2] = {2, 0};  // explicitly constrain 2 rows, leave the columns free
 MPI_Dims_create(size, 2, dims);
-// Per size=12: dims diventa {2, 6}, rispettando il vincolo dims[0]=2
+// For size=12: dims becomes {2, 6}, respecting the constraint dims[0]=2
 ```
 
-Se il numero di processi `nnodes` non ammette una fattorizzazione compatibile con i vincoli già fissati dal chiamante (ad esempio richiedere `dims[0]=5` con `size=12`, che non è divisibile per 5), la chiamata è un errore MPI. È inoltre importante notare che, se **tutte** le dimensioni sono già state fissate esplicitamente dal chiamante (nessun valore a 0 in ingresso), `MPI_Dims_create` si limita a verificarne la consistenza rispetto a `nnodes` (il prodotto deve corrispondere esattamente), senza modificare alcun valore.
+If the number of processes `nnodes` does not admit a factorization compatible with the constraints already fixed by the caller (for example requesting `dims[0]=5` with `size=12`, which is not divisible by 5), the call is an MPI error. It is also important to note that, if **all** the dimensions have already been explicitly fixed by the caller (no 0 value on input), `MPI_Dims_create` merely verifies their consistency with respect to `nnodes` (the product must match exactly), without modifying any value.
 
-## 7. Esercizi guidati
+## 7. Guided exercises
 
-### Esercizio 1 — Creazione della griglia e stampa dei vicini (`ex1_cart_create.cpp`)
+### Exercise 1 — Grid creation and neighbor printing (`ex1_cart_create.cpp`)
 
-Crea una griglia cartesiana 2D con `MPI_Cart_create`. Ogni processo determina le proprie coordinate con `MPI_Cart_coords` e i rank dei propri quattro vicini (nord, sud, ovest, est) con quattro chiamate a `MPI_Cart_shift` (due per l'asse verticale con `disp=±1`, due per l'asse orizzontale con `disp=±1`), stampando il risultato.
+Creates a 2D Cartesian grid with `MPI_Cart_create`. Each process determines its own coordinates with `MPI_Cart_coords` and the ranks of its four neighbors (north, south, west, east) with four calls to `MPI_Cart_shift` (two for the vertical axis with `disp=±1`, two for the horizontal axis with `disp=±1`), printing the result.
 
-**Obiettivo:** familiarizzare con la sequenza minima di chiamate necessaria per istanziare una topologia cartesiana e interrogarla (`Cart_create` → `Cart_coords` → `Cart_shift`), e osservare direttamente in output la comparsa di `MPI_PROC_NULL` per i processi posizionati sui bordi della griglia, verificando la correttezza della gestione dei casi limite descritta in sezione 5.
+**Objective:** become familiar with the minimal sequence of calls needed to instantiate a Cartesian topology and query it (`Cart_create` → `Cart_coords` → `Cart_shift`), and directly observe in the output the appearance of `MPI_PROC_NULL` for processes positioned at the edges of the grid, verifying the correctness of the edge-case handling described in section 5.
 
-### Esercizio 2 — Halo exchange su griglia (`ex2_halo_exchange.cpp`)
+### Exercise 2 — Halo exchange on a grid (`ex2_halo_exchange.cpp`)
 
-Ogni processo scambia i valori di confine con i propri quattro vicini usando `MPI_Sendrecv`, applicando lo stesso pattern di comunicazione già visto nella guida 04b (sezione 2.5) per l'halo exchange 1D, ma generalizzato a due dimensioni: qui ogni processo ha fino a quattro vicini (anziché due), corrispondenti ai quattro lati di una porzione bidimensionale di dominio, anziché ai soli lati nord/sud di una striscia 1D.
+Each process exchanges boundary values with its four neighbors using `MPI_Sendrecv`, applying the same communication pattern already seen in chapter 04b (section 2.5) for 1D halo exchange, but generalized to two dimensions: here each process has up to four neighbors (instead of two), corresponding to the four sides of a two-dimensional portion of the domain, rather than just the north/south sides of a 1D strip.
 
-**Obiettivo:** generalizzare il pattern di decomposizione del dominio e halo exchange dalla griglia 1D a strisce (guida 04b) a una decomposizione 2D a blocchi, osservando come l'uso di `MPI_Cart_shift` elimini la necessità di calcolare manualmente i rank dei quattro vicini (calcolo che, in una decomposizione 2D a blocchi indicizzata manualmente, sarebbe sensibilmente più soggetto a errore rispetto al caso 1D per via della doppia indicizzazione riga/colonna).
+**Objective:** generalize the domain decomposition and halo exchange pattern from the 1D strip grid (chapter 04b) to a 2D block decomposition, observing how the use of `MPI_Cart_shift` eliminates the need to manually compute the ranks of the four neighbors (a computation that, in a manually indexed 2D block decomposition, would be significantly more error-prone than in the 1D case due to the double row/column indexing).
 
-### Esercizio 3 — MPI_Dims_create (`ex3_dims_create.cpp`)
+### Exercise 3 — MPI_Dims_create (`ex3_dims_create.cpp`)
 
-Utilizza `MPI_Dims_create` per determinare automaticamente la decomposizione più bilanciata possibile per un dato numero di processi, senza fissare alcuna dimensione a priori (`dims[] = {0, 0}` in ingresso).
+Uses `MPI_Dims_create` to automatically determine the most balanced possible decomposition for a given number of processes, without fixing any dimension in advance (`dims[] = {0, 0}` as input).
 
-**Obiettivo:** osservare il comportamento di `MPI_Dims_create` su valori di `size` con fattorizzazioni diverse (numeri con molti fattori, come 12 o 16, rispetto a numeri primi, come 7 o 13, per i quali l'unica fattorizzazione bilanciata possibile in due fattori interi è banale, tipicamente `1×P`), comprendendo empiricamente il legame tra la fattorizzazione aritmetica di `size` e la "qualità" geometrica (rapporto tra i lati) della griglia risultante.
+**Objective:** observe the behavior of `MPI_Dims_create` on `size` values with different factorizations (numbers with many factors, such as 12 or 16, compared to prime numbers, such as 7 or 13, for which the only possible balanced factorization into two integer factors is trivial, typically `1×P`), gaining an empirical understanding of the relationship between the arithmetic factorization of `size` and the geometric "quality" (aspect ratio) of the resulting grid.
 
-## 8. Output atteso e come interpretarlo
+## 8. Expected output and how to interpret it
 
-### ex1_cart_create (eseguito con `-np 6`, griglia 2×3)
+### ex1_cart_create (run with `-np 6`, 2×3 grid)
 
 ```text
 Process 0 → coords(0,0) | N=MPI_PROC_NULL  S=3  W=MPI_PROC_NULL  E=1
@@ -261,13 +261,13 @@ Process 3 → coords(1,0) | N=0              S=MPI_PROC_NULL  W=MPI_PROC_NULL  E
 ...
 ```
 
-Con `size=6` e una griglia `dims={2,3}` (2 righe, 3 colonne, coerente con la convenzione row-major di sezione 3), i rank 0, 1, 2 occupano la riga 0 e i rank 3, 4, 5 la riga 1. Ogni processo della riga 0 ha correttamente `N=MPI_PROC_NULL` (nessun vicino a nord, essendo sulla prima riga e la griglia non periodica in questo esempio, `periods[0]=0`), mentre il rispettivo vicino a sud è il processo nella stessa colonna sulla riga 1 (ad esempio, per il processo 0 in `(0,0)`, il vicino sud è il processo 3 in `(1,0)`, coerente con la relazione `rank = coords[0]*dims[1] + coords[1]` di sezione 3: `1*3+0=3`). Analogamente, i processi in colonna 0 (P0, P3) hanno `W=MPI_PROC_NULL` e i processi in colonna 2 (P2, P5, non mostrato ma deducibile per simmetria) hanno `E=MPI_PROC_NULL`, coerentemente con l'assenza di periodicità anche sull'asse orizzontale. Si noti che ogni valore `S`/`N`/`E`/`W` diverso da `MPI_PROC_NULL` è simmetrico e reciproco tra coppie di processi adiacenti: il vicino sud di P0 è P3, e — come atteso — il vicino nord di P3 è P0, verificabile nella riga corrispondente dell'output.
+With `size=6` and a grid `dims={2,3}` (2 rows, 3 columns, consistent with the row-major convention from section 3), ranks 0, 1, 2 occupy row 0 and ranks 3, 4, 5 occupy row 1. Every process in row 0 correctly has `N=MPI_PROC_NULL` (no north neighbor, being on the first row with the grid non-periodic in this example, `periods[0]=0`), while its south neighbor is the process in the same column on row 1 (for example, for process 0 at `(0,0)`, the south neighbor is process 3 at `(1,0)`, consistent with the relationship `rank = coords[0]*dims[1] + coords[1]` from section 3: `1*3+0=3`). Similarly, the processes in column 0 (P0, P3) have `W=MPI_PROC_NULL` and the processes in column 2 (P2, P5, not shown but deducible by symmetry) have `E=MPI_PROC_NULL`, consistent with the absence of periodicity on the horizontal axis as well. Note that every `S`/`N`/`E`/`W` value other than `MPI_PROC_NULL` is symmetric and reciprocal between pairs of adjacent processes: the south neighbor of P0 is P3, and — as expected — the north neighbor of P3 is P0, verifiable in the corresponding line of the output.
 
-## 9. Errori comuni e come evitarli
+## 9. Common mistakes and how to avoid them
 
-| Errore | Causa tipica | Come evitarlo |
+| Mistake | Typical cause | How to avoid it |
 |---|---|---|
-| `MPI_Cart_create` termina il programma con errore | Il prodotto delle `dims[]` fornite eccede il numero di processi disponibili nel communicator di partenza | Verificare `dims[0] * dims[1] * ... == size` (o `≤ size`, gestendo esplicitamente i processi in eccesso) prima della chiamata, tipicamente derivando `dims[]` da `MPI_Dims_create` (sezione 6) invece di valori scelti arbitrariamente |
-| I rank dei vicini calcolati "a mano" (senza `MPI_Cart_shift`) risultano errati quando `reorder=1` | Assunzione implicita che il rank nel communicator cartesiano coincida con il rank originale in `comm_old`, violata quando l'implementazione MPI riassegna i rank per ottimizzazione del mapping fisico (sezione 1) | Con `reorder=1`, non calcolare mai manualmente i rank dei vicini a partire dal rank originale: usare sempre `MPI_Cart_shift`/`MPI_Cart_coords`/`MPI_Cart_rank`, che riflettono correttamente il mapping effettivo qualunque esso sia |
-| Confusione tra `direction` e l'etichetta geometrica nord/sud/est/ovest usata nel proprio codice | `direction=0` e `direction=1` sono indici astratti delle dimensioni della griglia (sezione 5); l'associazione a "verticale" o "orizzontale", e conseguentemente a nord/sud o est/ovest, è una convenzione scelta dal programmatore in fase di progettazione, non imposta da MPI | Documentare esplicitamente, a inizio codice, la convenzione scelta (es. "dims[0]=righe → direction=0 è l'asse verticale") e mantenerla coerente in tutte le chiamate a `MPI_Cart_shift` del programma |
-| Comunicazione bloccata indefinitamente (deadlock) nell'halo exchange 2D dell'esercizio 2 | Gestione non simmetrica dei quattro vicini, ad esempio usando `MPI_Send`/`MPI_Recv` separati invece di `MPI_Sendrecv` per ciascuna coppia di direzioni opposte (lo stesso scenario generale già discusso in guida 01a sezione 6 e in guida 03a sezione 2.5, qui replicato su quattro direzioni anziché due) | Usare sempre `MPI_Sendrecv` per ciascuna coppia direzione/verso opposto (una chiamata per l'asse verticale, una per l'asse orizzontale), passando direttamente gli output di `MPI_Cart_shift` come parametri `dest`/`source`, così come mostrato in sezione 5 |
+| `MPI_Cart_create` terminates the program with an error | The product of the supplied `dims[]` exceeds the number of processes available in the starting communicator | Verify `dims[0] * dims[1] * ... == size` (or `≤ size`, explicitly handling the excess processes) before the call, typically deriving `dims[]` from `MPI_Dims_create` (section 6) instead of arbitrarily chosen values |
+| Neighbor ranks computed "by hand" (without `MPI_Cart_shift`) turn out wrong when `reorder=1` | Implicit assumption that the rank in the Cartesian communicator coincides with the original rank in `comm_old`, violated when the MPI implementation reassigns ranks for physical mapping optimization (section 1) | With `reorder=1`, never manually compute neighbor ranks from the original rank: always use `MPI_Cart_shift`/`MPI_Cart_coords`/`MPI_Cart_rank`, which correctly reflect the actual mapping whatever it may be |
+| Confusion between `direction` and the geometric north/south/east/west label used in one's own code | `direction=0` and `direction=1` are abstract indices of the grid's dimensions (section 5); the association with "vertical" or "horizontal", and consequently with north/south or east/west, is a convention chosen by the programmer at design time, not imposed by MPI | Explicitly document, at the start of the code, the chosen convention (e.g. "dims[0]=rows → direction=0 is the vertical axis") and keep it consistent across all `MPI_Cart_shift` calls in the program |
+| Communication hangs indefinitely (deadlock) in the 2D halo exchange of exercise 2 | Asymmetric handling of the four neighbors, for example using separate `MPI_Send`/`MPI_Recv` instead of `MPI_Sendrecv` for each pair of opposite directions (the same general scenario already discussed in chapter 01a section 6 and in chapter 03a section 2.5, here replicated across four directions instead of two) | Always use `MPI_Sendrecv` for each pair of opposite direction/way (one call for the vertical axis, one for the horizontal axis), passing the outputs of `MPI_Cart_shift` directly as the `dest`/`source` parameters, as shown in section 5 |
