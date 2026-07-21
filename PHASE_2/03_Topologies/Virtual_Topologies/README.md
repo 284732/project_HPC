@@ -149,7 +149,7 @@ int MPI_Cart_shift(
 );
 ```
 
-Il punto concettualmente più delicato di questa funzione, spesso frainteso, è la relazione tra `disp` e i due output `rank_source`/`rank_destination`: **non** restituiscono semplicemente "il vicino avanti" e "il vicino indietro" in modo simmetrico e indipendente, ma sono pensati esplicitamente per essere passati **direttamente** come parametri `source` e `dest` di una singola chiamata `MPI_Sendrecv` (guida 03a, sezione 2.5), realizzando in un solo passo uno scambio di dati bidirezionale lungo quella direzione:
+Il punto concettualmente più delicato di questa funzione, spesso frainteso, è la relazione tra `disp` e i due output `rank_source`/`rank_destination`: **non** restituiscono semplicemente "il vicino avanti" e "il vicino indietro" in modo simmetrico e indipendente, ma sono pensati esplicitamente per essere passati **direttamente** come parametri `source` e `dest` di una singola chiamata `MPI_Sendrecv` (capitolo 03a, sezione 2.5), realizzando in un solo passo uno scambio di dati bidirezionale lungo quella direzione:
 
 ```cpp
 int rank_source, rank_dest;
