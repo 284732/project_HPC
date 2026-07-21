@@ -1,140 +1,140 @@
-# 03a — Solutore di Jacobi in MPI
+# 03a — Jacobi Solver in MPI
 
-> Capitolo di riferimento sul metodo iterativo di Jacobi applicato in ambiente a memoria distribuita. Presuppone la lettura dei capitoli precedenti (01a/01b — comunicazione point-to-point, 02 — comunicazione collettiva): qui `MPI_Allreduce` e `MPI_Allgather` vengono riutilizzate senza essere ridefinite da zero, mentre `MPI_Sendrecv` viene introdotta ex novo, essendo la prima occorrenza.
+> Reference chapter on the Jacobi iterative method applied in a distributed-memory environment. Assumes the previous chapters have been read (01a/01b — point-to-point communication, 02 — collective communication): here `MPI_Allreduce` and `MPI_Allgather` are reused without being redefined from scratch, while `MPI_Sendrecv` is introduced from scratch, as this is its first occurrence.
 >
-> Questo modulo presenta due applicazioni del metodo di Jacobi strutturalmente distinte: la prima applica il metodo alla soluzione numerica di un'equazione differenziale alle derivate parziali (PDE) tramite discretizzazione su griglia, con parallelizzazione **spaziale** del dominio; la seconda applica lo stesso metodo a un sistema lineare denso di piccola dimensione, con parallelizzazione **algebrica** a livello delle singole incognite. Il confronto tra le due strategie di parallelizzazione è l'obiettivo didattico-ingegneristico centrale di questa guida.
+> This module presents two structurally distinct applications of the Jacobi method: the first applies the method to the numerical solution of a partial differential equation (PDE) through grid discretization, with **spatial** parallelization of the domain; the second applies the same method to a small, dense linear system, with **algebraic** parallelization at the level of the individual unknowns. The comparison between the two parallelization strategies is the central didactic-engineering objective of this chapter.
 
 ---
 
-## Indice
+## Table of Contents
 
-1. [Il metodo di Jacobi: fondamenti matematici generali](#1-il-metodo-di-jacobi-fondamenti-matematici-generali)
-2. [Esercizio 1 — Diffusione del calore su griglia (Jacobi 1D a strisce)](#2-esercizio-1--diffusione-del-calore-su-griglia-jacobi-1d-a-strisce)
-   - 2.1 [Il problema fisico e l'equazione di Laplace](#21-il-problema-fisico-e-lequazione-di-laplace)
-   - 2.2 [Discretizzazione alle differenze finite: derivazione dello stencil](#22-discretizzazione-alle-differenze-finite-derivazione-dello-stencil)
-   - 2.3 [Condizioni al contorno](#23-condizioni-al-contorno)
-   - 2.4 [Strategia di parallelizzazione: decomposizione a strisce](#24-strategia-di-parallelizzazione-decomposizione-a-strisce)
-   - 2.5 [Ghost rows e halo exchange con MPI_Sendrecv](#25-ghost-rows-e-halo-exchange-con-mpi_sendrecv)
-   - 2.6 [Criterio di convergenza globale](#26-criterio-di-convergenza-globale)
-   - 2.7 [Algoritmo completo per iterazione](#27-algoritmo-completo-per-iterazione)
-   - 2.8 [Compilazione, esecuzione e output atteso](#28-compilazione-esecuzione-e-output-atteso)
-3. [Esercizio 2 — Jacobi su sistema lineare 4×4](#3-esercizio-2--jacobi-su-sistema-lineare-4×4)
-   - 3.1 [Formulazione algebrica e condizione di convergenza](#31-formulazione-algebrica-e-condizione-di-convergenza)
-   - 3.2 [Strategia di parallelizzazione: un'incognita per processo](#32-strategia-di-parallelizzazione-unincognita-per-processo)
-   - 3.3 [Pattern di comunicazione: perché Allgather e non halo exchange](#33-pattern-di-comunicazione-perché-allgather-e-non-halo-exchange)
-   - 3.4 [Algoritmo completo per iterazione](#34-algoritmo-completo-per-iterazione)
-   - 3.5 [Compilazione, esecuzione e output atteso](#35-compilazione-esecuzione-e-output-atteso)
-4. [Confronto tra le due strategie di parallelizzazione](#4-confronto-tra-le-due-strategie-di-parallelizzazione)
-5. [Errori comuni e come evitarli](#5-errori-comuni-e-come-evitarli)
+1. [The Jacobi method: general mathematical foundations](#1-the-jacobi-method-general-mathematical-foundations)
+2. [Exercise 1 — Heat diffusion on a grid (1D strip Jacobi)](#2-exercise-1--heat-diffusion-on-a-grid-1d-strip-jacobi)
+   - 2.1 [The physical problem and Laplace's equation](#21-the-physical-problem-and-laplaces-equation)
+   - 2.2 [Finite-difference discretization: derivation of the stencil](#22-finite-difference-discretization-derivation-of-the-stencil)
+   - 2.3 [Boundary conditions](#23-boundary-conditions)
+   - 2.4 [Parallelization strategy: strip decomposition](#24-parallelization-strategy-strip-decomposition)
+   - 2.5 [Ghost rows and halo exchange with MPI_Sendrecv](#25-ghost-rows-and-halo-exchange-with-mpi_sendrecv)
+   - 2.6 [Global convergence criterion](#26-global-convergence-criterion)
+   - 2.7 [Complete per-iteration algorithm](#27-complete-per-iteration-algorithm)
+   - 2.8 [Compilation, execution, and expected output](#28-compilation-execution-and-expected-output)
+3. [Exercise 2 — Jacobi on a 4×4 linear system](#3-exercise-2--jacobi-on-a-4×4-linear-system)
+   - 3.1 [Algebraic formulation and convergence condition](#31-algebraic-formulation-and-convergence-condition)
+   - 3.2 [Parallelization strategy: one unknown per process](#32-parallelization-strategy-one-unknown-per-process)
+   - 3.3 [Communication pattern: why Allgather and not halo exchange](#33-communication-pattern-why-allgather-and-not-halo-exchange)
+   - 3.4 [Complete per-iteration algorithm](#34-complete-per-iteration-algorithm)
+   - 3.5 [Compilation, execution, and expected output](#35-compilation-execution-and-expected-output)
+4. [Comparison between the two parallelization strategies](#4-comparison-between-the-two-parallelization-strategies)
+5. [Common mistakes and how to avoid them](#5-common-mistakes-and-how-to-avoid-them)
 
 ---
 
-## 1. Il metodo di Jacobi: fondamenti matematici generali
+## 1. The Jacobi method: general mathematical foundations
 
-Il metodo di Jacobi è un metodo iterativo per la soluzione di sistemi lineari `Ax = b`, appartenente alla famiglia dei metodi basati sullo **splitting** della matrice dei coefficienti. Si scompone `A` come:
+The Jacobi method is an iterative method for solving linear systems `Ax = b`, belonging to the family of methods based on the **splitting** of the coefficient matrix. `A` is decomposed as:
 
 ```
 A = D - L - U
 ```
 
-dove `D` è la matrice diagonale contenente gli elementi diagonali di `A`, `-L` è la parte strettamente triangolare inferiore e `-U` la parte strettamente triangolare superiore (con segno tale che `L` e `U` abbiano diagonale nulla e contengano gli opposti degli elementi fuori diagonale). Il sistema `Ax = b` si riscrive quindi come:
+where `D` is the diagonal matrix containing the diagonal entries of `A`, `-L` is the strictly lower triangular part, and `-U` is the strictly upper triangular part (with a sign such that `L` and `U` have zero diagonal and contain the negatives of the off-diagonal entries). The system `Ax = b` is therefore rewritten as:
 
 ```
 (D - L - U)x = b   ⟹   Dx = (L + U)x + b   ⟹   x = D⁻¹(L + U)x + D⁻¹b
 ```
 
-Questa riscrittura suggerisce naturalmente uno schema iterativo a punto fisso:
+This rewriting naturally suggests a fixed-point iterative scheme:
 
 ```
 x^(k+1) = D⁻¹(L + U) x^(k) + D⁻¹b
 ```
 
-dove `x^(k)` indica il vettore delle incognite alla `k`-esima iterazione. La matrice `T = D⁻¹(L + U)` è detta **matrice di iterazione di Jacobi**. Componente per componente, l'aggiornamento si esplicita come:
+where `x^(k)` denotes the vector of unknowns at the `k`-th iteration. The matrix `T = D⁻¹(L + U)` is called the **Jacobi iteration matrix**. Component by component, the update is written explicitly as:
 
 ```
 x_i^(k+1) = ( b_i - Σ_{j≠i} a_ij · x_j^(k) ) / a_ii
 ```
 
-ossia: l'incognita `i`-esima viene isolata usando l'equazione `i`-esima del sistema originale, sostituendo a tutte le altre incognite i valori dell'iterazione **precedente** (non quelli già aggiornati nell'iterazione corrente — questa è la distinzione fondamentale rispetto al metodo di Gauss-Seidel, che invece riutilizza immediatamente i valori più recenti disponibili, introducendo però una dipendenza sequenziale tra le componenti che rende il metodo intrinsecamente meno parallelizzabile).
+that is: the `i`-th unknown is isolated using the `i`-th equation of the original system, substituting into all the other unknowns the values from the **previous** iteration (not the ones already updated in the current iteration — this is the fundamental distinction from the Gauss-Seidel method, which instead immediately reuses the most recently available values, but in doing so introduces a sequential dependency between components that makes the method intrinsically less parallelizable).
 
-**Condizione di convergenza.** Il metodo converge, per qualunque scelta del vettore iniziale `x^(0)`, se e solo se il raggio spettrale della matrice di iterazione `T = D⁻¹(L + U)` è strettamente minore di 1:
+**Convergence condition.** The method converges, for any choice of the initial vector `x^(0)`, if and only if the spectral radius of the iteration matrix `T = D⁻¹(L + U)` is strictly less than 1:
 
 ```
 ρ(T) = max_i |λ_i(T)| < 1
 ```
 
-dove `λ_i(T)` sono gli autovalori di `T`. Verificare direttamente questa condizione richiede il calcolo degli autovalori, operazione costosa; esiste tuttavia una condizione **sufficiente** (ma non necessaria) più semplice da verificare, quella di **dominanza diagonale stretta per righe**:
+where `λ_i(T)` are the eigenvalues of `T`. Directly verifying this condition requires computing the eigenvalues, an expensive operation; however, there is a **sufficient** (but not necessary) condition that is simpler to check, that of **strict row-wise diagonal dominance**:
 
 ```
-|a_ii| > Σ_{j≠i} |a_ij|    per ogni riga i
+|a_ii| > Σ_{j≠i} |a_ij|    for every row i
 ```
 
-Se questa condizione è soddisfatta per ogni riga della matrice, si dimostra che `ρ(T) < 1` (in norma infinito, `‖T‖_∞ < 1`, il che implica `ρ(T) ≤ ‖T‖_∞ < 1` per la relazione generale tra raggio spettrale e una qualsiasi norma matriciale indotta), e quindi il metodo converge indipendentemente dal punto di partenza. Entrambi gli esercizi di questo modulo sfruttano, in forme diverse, questa proprietà: il primo la eredita implicitamente dalla struttura del laplaciano discreto (stencil a 5 punti, coefficiente diagonale pari alla somma dei pesi dei vicini in valore assoluto, con uguaglianza — non stretta dominanza — compensata dalle condizioni al contorno di Dirichlet che fissano valori noti sul bordo), il secondo la verifica esplicitamente sulla matrice 4×4 del sistema (sezione 3.1).
+If this condition holds for every row of the matrix, it can be shown that `ρ(T) < 1` (in the infinity norm, `‖T‖_∞ < 1`, which implies `ρ(T) ≤ ‖T‖_∞ < 1` by the general relationship between the spectral radius and any induced matrix norm), and the method therefore converges regardless of the starting point. Both exercises in this module exploit this property, in different forms: the first inherits it implicitly from the structure of the discrete Laplacian (5-point stencil, diagonal coefficient equal to the sum of the absolute values of the neighbor weights, with equality — not strict dominance — compensated by the Dirichlet boundary conditions, which fix known values at the boundary), the second verifies it explicitly on the system's 4×4 matrix (section 3.1).
 
-**Criterio d'arresto pratico.** Poiché la convergenza teorica è asintotica (il metodo raggiunge la soluzione esatta solo per `k → ∞`), in pratica l'iterazione si interrompe quando una misura dello scarto tra iterazioni successive scende sotto una soglia di tolleranza `ε` fissata a priori:
+**Practical stopping criterion.** Since theoretical convergence is asymptotic (the method reaches the exact solution only as `k → ∞`), in practice the iteration is stopped when a measure of the difference between successive iterations drops below a tolerance threshold `ε` fixed in advance:
 
 ```
 ‖x^(k+1) - x^(k)‖ < ε
 ```
 
-Entrambi gli esercizi di questo modulo usano la norma infinito (massimo scarto puntuale in valore assoluto) come criterio, per ragioni sia di semplicità implementativa sia di aderenza diretta al significato fisico/numerico della grandezza monitorata.
+Both exercises in this module use the infinity norm (maximum pointwise absolute difference) as the criterion, both for implementation simplicity and for its direct correspondence with the physical/numerical meaning of the monitored quantity.
 
-## 2. Esercizio 1 — Diffusione del calore su griglia (Jacobi 1D a strisce)
+## 2. Exercise 1 — Heat diffusion on a grid (1D strip Jacobi)
 
-### 2.1 Il problema fisico e l'equazione di Laplace
+### 2.1 The physical problem and Laplace's equation
 
-Si risolve l'**equazione di Laplace** su un dominio quadrato `[0,1]×[0,1]`:
-
-```
--∇²u = 0    all'interno del dominio
- u   = g    sul bordo (condizioni di Dirichlet)
-```
-
-dove `∇²u = ∂²u/∂x² + ∂²u/∂y²` è l'operatore di Laplace (laplaciano) applicato al campo scalare `u(x,y)`. Questa equazione descrive la distribuzione di temperatura in **regime stazionario** (nessuna dipendenza dal tempo: `∂u/∂t = 0`, condizione che si ottiene come caso limite dell'equazione del calore parabolica `∂u/∂t = α∇²u` quando il transitorio si è esaurito) su una lamina piana, dati valori di temperatura fissati sul bordo del dominio (condizioni al contorno di **tipo Dirichlet**, in cui è il valore della funzione, non la sua derivata normale, ad essere specificato sul bordo).
-
-Le condizioni al contorno usate in questo esercizio sono:
+We solve **Laplace's equation** on a square domain `[0,1]×[0,1]`:
 
 ```
-Bordo superiore (riga 0):     u = 0.0  (freddo)
-Bordo sinistro  (colonna 0):  u = 0.0
-Bordo destro    (colonna N-1): u = 0.0
-Bordo inferiore (riga N-1):   u = 1.0  (caldo)
+-∇²u = 0    inside the domain
+ u   = g    on the boundary (Dirichlet conditions)
 ```
 
-Fisicamente, questo corrisponde a una lamina quadrata con tre lati mantenuti a temperatura 0 e un lato mantenuto a temperatura 1: la soluzione stazionaria `u(x,y)` rappresenta la temperatura di equilibrio in ogni punto interno del dominio, risultato della diffusione del calore dal bordo caldo verso il resto della lamina.
+where `∇²u = ∂²u/∂x² + ∂²u/∂y²` is the Laplace operator (Laplacian) applied to the scalar field `u(x,y)`. This equation describes the temperature distribution in **steady state** (no time dependence: `∂u/∂t = 0`, a condition obtained as the limiting case of the parabolic heat equation `∂u/∂t = α∇²u` once the transient has died out) on a flat plate, given fixed temperature values on the boundary of the domain (**Dirichlet-type** boundary conditions, in which it is the value of the function, not its normal derivative, that is specified on the boundary).
 
-### 2.2 Discretizzazione alle differenze finite: derivazione dello stencil
+The boundary conditions used in this exercise are:
 
-Per risolvere numericamente l'equazione, il dominio continuo viene discretizzato su una griglia regolare N×N di punti, con passo di griglia `h = 1/(N-1)` in entrambe le direzioni. Il valore `u(x,y)` viene approssimato dai valori discreti `u[i][j] ≈ u(i·h, j·h)` nei nodi della griglia.
+```
+Top boundary    (row 0):     u = 0.0  (cold)
+Left boundary   (column 0):  u = 0.0
+Right boundary  (column N-1): u = 0.0
+Bottom boundary (row N-1):   u = 1.0  (hot)
+```
 
-Le derivate parziali seconde vengono approssimate tramite lo schema alle **differenze finite centrate** del secondo ordine:
+Physically, this corresponds to a square plate with three sides held at temperature 0 and one side held at temperature 1: the steady-state solution `u(x,y)` represents the equilibrium temperature at every interior point of the domain, the result of heat diffusing from the hot boundary toward the rest of the plate.
+
+### 2.2 Finite-difference discretization: derivation of the stencil
+
+To solve the equation numerically, the continuous domain is discretized on a regular N×N grid of points, with grid spacing `h = 1/(N-1)` in both directions. The value `u(x,y)` is approximated by the discrete values `u[i][j] ≈ u(i·h, j·h)` at the grid nodes.
+
+The second partial derivatives are approximated using the second-order **centered finite-difference** scheme:
 
 ```
 ∂²u/∂x² ≈ ( u[i-1][j] - 2·u[i][j] + u[i+1][j] ) / h²
 ∂²u/∂y² ≈ ( u[i][j-1] - 2·u[i][j] + u[i][j+1] ) / h²
 ```
 
-Questa approssimazione deriva dallo sviluppo in serie di Taylor di `u` attorno al punto `(i,j)` nelle due direzioni, troncato al secondo ordine: sommando gli sviluppi di `u[i+1][j]` e `u[i-1][j]` (o analogamente per la direzione `j`), i termini di ordine dispari si cancellano per simmetria, lasciando un errore di troncamento locale `O(h²)`.
+This approximation is derived from the Taylor series expansion of `u` around the point `(i,j)` in the two directions, truncated at second order: summing the expansions of `u[i+1][j]` and `u[i-1][j]` (or analogously for the `j` direction), the odd-order terms cancel out by symmetry, leaving a local truncation error of `O(h²)`.
 
-Sostituendo entrambe le approssimazioni nell'equazione `-∇²u = 0`, ovvero `∂²u/∂x² + ∂²u/∂y² = 0`, si ottiene:
+Substituting both approximations into the equation `-∇²u = 0`, i.e. `∂²u/∂x² + ∂²u/∂y² = 0`, gives:
 
 ```
 ( u[i-1][j] - 2u[i][j] + u[i+1][j] ) / h² + ( u[i][j-1] - 2u[i][j] + u[i][j+1] ) / h² = 0
 ```
 
-Moltiplicando per `h²` e raccogliendo i termini in `u[i][j]` (che compaiono con coefficiente `-4`):
+Multiplying by `h²` and collecting the terms in `u[i][j]` (which appear with coefficient `-4`):
 
 ```
 u[i-1][j] + u[i+1][j] + u[i][j-1] + u[i][j+1] - 4·u[i][j] = 0
 ```
 
-da cui, isolando `u[i][j]`:
+from which, isolating `u[i][j]`:
 
 ```
 u[i][j] = 0.25 · ( u[i-1][j] + u[i+1][j] + u[i][j-1] + u[i][j+1] )
 ```
 
-Questa è esattamente la relazione di punto fisso che il metodo di Jacobi itera, applicata **localmente** ad ogni nodo interno della griglia: il valore in ogni punto, a convergenza, è la media aritmetica dei quattro vicini cardinali (nord, sud, est, ovest). Il pattern di accesso a 5 punti (il nodo stesso più i 4 vicini) è noto come **stencil a 5 punti** (5-point stencil):
+This is exactly the fixed-point relation that the Jacobi method iterates, applied **locally** at every interior node of the grid: the value at each point, at convergence, is the arithmetic mean of the four cardinal neighbors (north, south, east, west). This 5-point access pattern (the node itself plus its 4 neighbors) is known as the **5-point stencil**:
 
 ```
              u[i-1][j]
@@ -143,75 +143,75 @@ u[i][j-1] --- u[i][j] --- u[i][j+1]
                  |
              u[i+1][j]
 
-Aggiornamento: u_new[i][j] = 0.25 · (u[i-1][j] + u[i+1][j] + u[i][j-1] + u[i][j+1])
+Update: u_new[i][j] = 0.25 · (u[i-1][j] + u[i+1][j] + u[i][j-1] + u[i][j+1])
 ```
 
-Da notare la corrispondenza diretta con il caso generale della sezione 1: la matrice `A` implicita in questa formulazione (se si "srotolasse" la griglia bidimensionale in un vettore monodimensionale di incognite, come si farebbe per un solutore diretto) avrebbe `-4` sulla diagonale e `+1` nelle quattro posizioni corrispondenti ai vicini dello stencil — una matrice sparsa, pentadiagonale a blocchi, con dominanza diagonale non stretta ma "quasi ovunque" resa effettivamente stretta dai nodi adiacenti al bordo, dove alcuni dei quattro vicini sono in realtà valori di bordo noti (costanti), non incognite.
+Note the direct correspondence with the general case from section 1: the matrix `A` implicit in this formulation (if the two-dimensional grid were "unrolled" into a one-dimensional vector of unknowns, as would be done for a direct solver) would have `-4` on the diagonal and `+1` in the four positions corresponding to the stencil's neighbors — a sparse, block-pentadiagonal matrix, with diagonal dominance that is not strict but is made effectively strict "almost everywhere" by the nodes adjacent to the boundary, where some of the four neighbors are actually known boundary values (constants), not unknowns.
 
-Il metodo itera l'aggiornamento su tutti i nodi **interni** della griglia (i nodi di bordo restano fissati alle condizioni di Dirichlet e non vengono mai aggiornati) fino a quando la variazione puntuale massima tra due iterazioni successive scende sotto una soglia `ε`:
+The method iterates the update over all the **interior** nodes of the grid (the boundary nodes remain fixed at the Dirichlet conditions and are never updated) until the maximum pointwise change between two successive iterations drops below a threshold `ε`:
 
 ```
 max_{i,j} |u_new[i][j] - u[i][j]| < ε
 ```
 
-### 2.3 Condizioni al contorno
+### 2.3 Boundary conditions
 
-Le condizioni al contorno sono imposte fissando i valori di `u` sulle righe/colonne di bordo del dominio globale e **non aggiornandoli mai** durante l'iterazione: riga 0 (bordo superiore) e colonna 0/colonna N-1 (bordi laterali) restano a `0.0`; l'ultima riga (bordo inferiore) resta a `1.0`. Solo i nodi strettamente interni alla griglia (`1 ≤ i ≤ N-2`, `1 ≤ j ≤ N-2` nella numerazione globale) sono soggetti all'aggiornamento dello stencil descritto sopra.
+The boundary conditions are imposed by fixing the values of `u` on the boundary rows/columns of the global domain and **never updating them** during the iteration: row 0 (top boundary) and column 0/column N-1 (side boundaries) remain at `0.0`; the last row (bottom boundary) remains at `1.0`. Only the nodes strictly interior to the grid (`1 ≤ i ≤ N-2`, `1 ≤ j ≤ N-2` in global numbering) are subject to the stencil update described above.
 
-### 2.4 Strategia di parallelizzazione: decomposizione a strisce
+### 2.4 Parallelization strategy: strip decomposition
 
-La griglia globale N×N viene partizionata in **strisce orizzontali contigue di righe**, una per processo, secondo uno schema di **decomposizione del dominio** (domain decomposition) 1D:
+The global N×N grid is partitioned into **contiguous horizontal strips of rows**, one per process, following a 1D **domain decomposition** scheme:
 
 ```
-Processo 0:    righe  0      ..  N/P-1     + ghost row sud
-Processo 1:    righe  N/P    ..  2N/P-1    + ghost row nord e sud
+Process 0:    rows  0      ..  N/P-1     + south ghost row
+Process 1:    rows  N/P    ..  2N/P-1    + north and south ghost rows
 ...
-Processo P-1:  righe (P-1)N/P .. N-1       + ghost row nord
+Process P-1:  rows (P-1)N/P .. N-1       + north ghost row
 ```
 
-Ogni processo possiede in memoria locale le proprie righe assegnate **più** una o due righe aggiuntive dette **ghost row** (righe fantasma), che replicano localmente i valori delle righe di confine dei processi vicini. Questa replica è necessaria perché lo stencil a 5 punti, applicato a un nodo sul bordo superiore o inferiore della striscia locale di un processo, richiede il valore del vicino nord o sud, che fisicamente risiede nella memoria di un **altro** processo. Senza le ghost row, ogni processo dovrebbe effettuare una comunicazione point-to-point per ciascun accesso al confine ad ogni singolo aggiornamento di nodo, con un overhead di comunicazione proibitivo; con le ghost row, la comunicazione viene invece **batchata**: una sola coppia di scambi di riga per vicino, per ogni iterazione completa dello stencil su tutti i nodi interni della striscia locale.
+Each process holds in local memory its assigned rows **plus** one or two additional rows called **ghost rows**, which locally replicate the values of the boundary rows of the neighboring processes. This replication is necessary because the 5-point stencil, applied to a node on the upper or lower boundary of a process's local strip, requires the value of the north or south neighbor, which physically resides in the memory of **another** process. Without ghost rows, each process would have to perform a point-to-point communication for every boundary access at every single node update, with prohibitive communication overhead; with ghost rows, the communication is instead **batched**: a single pair of row exchanges per neighbor, for each complete iteration of the stencil over all the interior nodes of the local strip.
 
-Il processo di rank `r` (con `0 < r < P-1`, quindi non ai bordi della decomposizione) ha come vicino nord il processo `r-1` e come vicino sud il processo `r+1`. I processi di rank `0` e `P-1` hanno un solo vicino (rispettivamente solo sud e solo nord), dato che le loro righe di confine opposte coincidono con il bordo fisico del dominio globale (condizione di Dirichlet nota, non ghost row da altri processi).
+The process of rank `r` (with `0 < r < P-1`, i.e. not at the edges of the decomposition) has process `r-1` as its north neighbor and process `r+1` as its south neighbor. The processes of rank `0` and `P-1` have only one neighbor (only south and only north, respectively), since their opposite boundary rows coincide with the physical boundary of the global domain (a known Dirichlet condition, not a ghost row from other processes).
 
-### 2.5 Ghost rows e halo exchange con MPI_Sendrecv
+### 2.5 Ghost rows and halo exchange with MPI_Sendrecv
 
-Ad ogni iterazione, prima di poter applicare lo stencil sui nodi di confine della propria striscia locale, ogni processo deve aggiornare le proprie ghost row con i valori correnti delle righe di confine dei vicini. Questa operazione è nota come **halo exchange** (scambio dell'alone/margine).
+At every iteration, before it can apply the stencil to the boundary nodes of its own local strip, each process must update its ghost rows with the current values of the neighbors' boundary rows. This operation is known as **halo exchange**.
 
-L'implementazione tipica usa `MPI_Sendrecv`, una primitiva **bloccante** che combina in un'unica chiamata un invio e una ricezione simultanei, evitando esplicitamente il rischio di deadlock descritto nella guida 01a (sezione 6) per pattern di invio/ricezione simmetrici tra processi vicini:
+The typical implementation uses `MPI_Sendrecv`, a **blocking** primitive that combines a simultaneous send and receive into a single call, explicitly avoiding the deadlock risk described in chapter 01a (section 6) for symmetric send/receive patterns between neighboring processes:
 
 ```cpp
 int MPI_Sendrecv(
-    const void*  sendbuf,     // buffer da inviare al vicino
-    int          sendcount,   // numero di elementi da inviare
+    const void*  sendbuf,     // buffer to send to the neighbor
+    int          sendcount,   // number of elements to send
     MPI_Datatype sendtype,
-    int          dest,        // rank del processo a cui inviare
-    int          sendtag,     // tag del messaggio in uscita
-    void*        recvbuf,     // buffer in cui ricevere dal vicino (DISTINTO
-                               // da sendbuf: MPI_Sendrecv non è in-place)
-    int          recvcount,   // capacità massima del buffer di ricezione
+    int          dest,        // rank of the process to send to
+    int          sendtag,     // tag of the outgoing message
+    void*        recvbuf,     // buffer in which to receive from the neighbor
+                               // (DISTINCT from sendbuf: MPI_Sendrecv is not in-place)
+    int          recvcount,   // maximum capacity of the receive buffer
     MPI_Datatype recvtype,
-    int          source,      // rank del processo da cui ricevere
-    int          recvtag,     // tag atteso del messaggio in ingresso
+    int          source,      // rank of the process to receive from
+    int          recvtag,     // expected tag of the incoming message
     MPI_Comm     comm,
     MPI_Status*  status
 );
 ```
 
-Il punto cruciale di `MPI_Sendrecv` è che l'implementazione MPI **gestisce internamente** l'ordinamento delle operazioni di invio e ricezione in modo da evitare il deadlock che si presenterebbe scrivendo manualmente due `MPI_Send` bloccanti consecutivi tra processi che si scambiano dati simmetricamente (esattamente lo scenario discusso nella guida 01a, sezione 6.1). Semanticamente, `MPI_Sendrecv` è equivalente a eseguire una `MPI_Isend` e una `MPI_Irecv` seguite da una `MPI_Waitall` su entrambe (guida 01b), ma senza dover gestire esplicitamente gli handle `MPI_Request`: la gestione dell'asincronia interna è delegata completamente all'implementazione.
+The crucial point of `MPI_Sendrecv` is that the MPI implementation **internally manages** the ordering of the send and receive operations so as to avoid the deadlock that would arise from manually writing two consecutive blocking `MPI_Send` calls between processes exchanging data symmetrically (exactly the scenario discussed in chapter 01a, section 6.1). Semantically, `MPI_Sendrecv` is equivalent to performing an `MPI_Isend` and an `MPI_Irecv` followed by an `MPI_Waitall` on both (chapter 01b), but without having to explicitly manage `MPI_Request` handles: the management of the internal asynchrony is delegated entirely to the implementation.
 
-Nel contesto dell'halo exchange, ogni processo esegue **due** chiamate `MPI_Sendrecv` per iterazione (una per il vicino nord, una per il vicino sud), ciascuna delle quali invia la propria riga di confine e riceve contestualmente la ghost row corrispondente:
+In the context of halo exchange, each process performs **two** `MPI_Sendrecv` calls per iteration (one for the north neighbor, one for the south neighbor), each of which sends its own boundary row and simultaneously receives the corresponding ghost row:
 
 ```cpp
-// Scambio con il vicino sud: invio la mia ultima riga locale,
-// ricevo la sua prima riga locale nella mia ghost row sud
+// Exchange with the south neighbor: I send my last local row,
+// I receive its first local row into my south ghost row
 MPI_Sendrecv(
     &u[last_local_row][0], N, MPI_DOUBLE, south_neighbor, TAG_S,
     &u[ghost_row_south][0], N, MPI_DOUBLE, south_neighbor, TAG_N,
     MPI_COMM_WORLD, MPI_STATUS_IGNORE
 );
 
-// Scambio con il vicino nord: invio la mia prima riga locale,
-// ricevo la sua ultima riga locale nella mia ghost row nord
+// Exchange with the north neighbor: I send my first local row,
+// I receive its last local row into my north ghost row
 MPI_Sendrecv(
     &u[first_local_row][0], N, MPI_DOUBLE, north_neighbor, TAG_N,
     &u[ghost_row_north][0], N, MPI_DOUBLE, north_neighbor, TAG_S,
@@ -219,50 +219,50 @@ MPI_Sendrecv(
 );
 ```
 
-I processi ai bordi della decomposizione (rank 0 e rank P-1), privi di un vicino su un lato, tipicamente gestiscono l'assenza del vicino con una condizionale (`if (rank > 0) ...` / `if (rank < size-1) ...`) attorno alla rispettiva `MPI_Sendrecv`, oppure — soluzione più elegante e meno soggetta a errori — utilizzando `MPI_PROC_NULL` come valore di `dest`/`source` per il lato mancante: le chiamate MPI verso/da `MPI_PROC_NULL` sono no-op garantite dallo standard (ritornano immediatamente senza effetto), eliminando la necessità di logica condizionale esplicita nel codice di comunicazione.
+The processes at the edges of the decomposition (rank 0 and rank P-1), lacking a neighbor on one side, typically handle the absence of that neighbor with a conditional (`if (rank > 0) ...` / `if (rank < size-1) ...`) around the corresponding `MPI_Sendrecv`, or — a more elegant and less error-prone solution — by using `MPI_PROC_NULL` as the value of `dest`/`source` for the missing side: MPI calls to/from `MPI_PROC_NULL` are guaranteed by the standard to be no-ops (they return immediately with no effect), eliminating the need for explicit conditional logic in the communication code.
 
-### 2.6 Criterio di convergenza globale
+### 2.6 Global convergence criterion
 
-Ogni processo, dopo aver applicato lo stencil di Jacobi su tutti i nodi interni della propria striscia locale, calcola la propria variazione massima **locale**:
+Each process, after applying the Jacobi stencil to all the interior nodes of its own local strip, computes its own **local** maximum change:
 
 ```cpp
 double local_max_change = 0.0;
-for (/* ogni nodo interno locale i,j */) {
+for (/* every local interior node i,j */) {
     double diff = std::fabs(u_new[i][j] - u[i][j]);
     local_max_change = std::max(local_max_change, diff);
 }
 ```
 
-Questo valore locale, tuttavia, non è sufficiente a decidere la convergenza globale dell'algoritmo: il criterio d'arresto richiede il massimo su **tutti** i nodi del dominio, distribuiti su tutti i processi. Si utilizza quindi `MPI_Allreduce` con operatore `MPI_MAX` (guida 03, sezione 6) per aggregare i massimi locali in un unico massimo globale, reso disponibile a **tutti** i processi (necessario perché ogni processo deve poter decidere autonomamente, con lo stesso esito, se uscire dal ciclo di iterazione — un `MPI_Reduce` con notifica solo al root richiederebbe una successiva `MPI_Bcast` per comunicare la decisione di arresto a tutti gli altri processi):
+This local value, however, is not sufficient to decide the algorithm's global convergence: the stopping criterion requires the maximum over **all** the nodes of the domain, distributed across all the processes. `MPI_Allreduce` with the `MPI_MAX` operator (chapter 03, section 6) is therefore used to aggregate the local maxima into a single global maximum, made available to **all** processes (necessary because every process must be able to decide independently, with the same outcome, whether to exit the iteration loop — an `MPI_Reduce` that only notifies the root would require a subsequent `MPI_Bcast` to communicate the stopping decision to all the other processes):
 
 ```cpp
 double global_max_change;
 MPI_Allreduce(&local_max_change, &global_max_change, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
-if (global_max_change < EPS) break;  // condizione di uscita, identica su ogni processo
+if (global_max_change < EPS) break;  // exit condition, identical on every process
 ```
 
-### 2.7 Algoritmo completo per iterazione
+### 2.7 Complete per-iteration algorithm
 
 ```
-Iterazione k:
-  ├── MPI_Sendrecv × 2   (scambio halo nord-sud con i processi vicini)
-  ├── Aggiornamento stencil di Jacobi (calcolo locale, nodi interni)
-  ├── Calcolo local_max_change (riduzione locale, nessuna comunicazione)
-  ├── MPI_Allreduce (MPI_MAX)  (riduzione globale, criterio di convergenza)
-  └── std::swap(u, u_new)     (scambio dei puntatori/buffer, nessuna copia)
+Iteration k:
+  ├── MPI_Sendrecv × 2   (north-south halo exchange with neighboring processes)
+  ├── Jacobi stencil update (local computation, interior nodes)
+  ├── Compute local_max_change (local reduction, no communication)
+  ├── MPI_Allreduce (MPI_MAX)  (global reduction, convergence criterion)
+  └── std::swap(u, u_new)     (swap of pointers/buffers, no copying)
 ```
 
-Da notare l'uso di `std::swap(u, u_new)` al termine di ogni iterazione, anziché una copia elemento per elemento da `u_new` a `u`: poiché lo stencil di Jacobi (a differenza di Gauss-Seidel) richiede esplicitamente che tutti gli aggiornamenti di un'iterazione usino solo valori "congelati" dell'iterazione precedente, è necessario mantenere due buffer distinti (`u` e `u_new`) durante il calcolo dello stencil, per evitare che un nodo aggiornato per primo influenzi il calcolo di un nodo aggiornato successivamente nella stessa iterazione. Scambiare i puntatori ai due buffer, invece di copiarne il contenuto, è un'ottimizzazione elementare ma importante dal punto di vista prestazionale: riduce il costo per iterazione da `O(righe_locali × N)` operazioni di copia a `O(1)` (uno scambio di due puntatori).
+Note the use of `std::swap(u, u_new)` at the end of each iteration, instead of an element-by-element copy from `u_new` to `u`: since the Jacobi stencil (unlike Gauss-Seidel) explicitly requires that all updates within an iteration use only "frozen" values from the previous iteration, two distinct buffers (`u` and `u_new`) must be kept during the stencil computation, to prevent a node updated first from influencing the computation of a node updated later in the same iteration. Swapping the pointers to the two buffers, instead of copying their contents, is an elementary but performance-important optimization: it reduces the per-iteration cost from `O(local_rows × N)` copy operations to `O(1)` (a swap of two pointers).
 
-### 2.8 Compilazione, esecuzione e output atteso
+### 2.8 Compilation, execution, and expected output
 
 ```bash
 mpicxx -O2 -Wall -o jacobi1d jacobi_1d_strips.cpp
 mpirun -np 4 ./jacobi1d
 ```
 
-Output atteso:
+Expected output:
 
 ```text
 [Iter  100] max change = 1.2346e-02
@@ -274,13 +274,13 @@ Output atteso:
   Processes used:    4
 ```
 
-Il valore `max change`, stampato periodicamente (tipicamente ogni 100 iterazioni, per non saturare l'output con una riga per iterazione), è il risultato della `MPI_Allreduce` di sezione 2.6: essendo identico su tutti i processi al termine della riduzione, la stampa periodica viene tipicamente condizionata a `if (rank == 0)` per evitare P righe identiche ridondanti per ogni checkpoint. La monotonia decrescente della sequenza (`1.2346e-02` → `6.2134e-03` → ...) è attesa e coerente con la natura del metodo di Jacobi per questo problema: essendo `ρ(T) < 1` (sezione 1), l'errore decresce geometricamente ad ogni iterazione con fattore asintotico pari al raggio spettrale della matrice di iterazione. Il numero di iterazioni necessarie per raggiungere la soglia `ε` dipende sia dalla dimensione della griglia `N` (raffinare la griglia peggiora la velocità di convergenza del metodo di Jacobi applicato al laplaciano discreto, poiché `ρ(T) → 1` per `h → 0`) sia dal valore di `ε` scelto.
+The `max change` value, printed periodically (typically every 100 iterations, so as not to flood the output with one line per iteration), is the result of the `MPI_Allreduce` from section 2.6: since it is identical on all processes at the end of the reduction, the periodic printing is typically conditioned on `if (rank == 0)` to avoid P identical redundant lines at every checkpoint. The decreasing monotonicity of the sequence (`1.2346e-02` → `6.2134e-03` → ...) is expected and consistent with the nature of the Jacobi method for this problem: since `ρ(T) < 1` (section 1), the error decreases geometrically at each iteration with an asymptotic factor equal to the spectral radius of the iteration matrix. The number of iterations needed to reach the threshold `ε` depends both on the grid size `N` (refining the grid worsens the convergence speed of the Jacobi method applied to the discrete Laplacian, since `ρ(T) → 1` as `h → 0`) and on the chosen value of `ε`.
 
-## 3. Esercizio 2 — Jacobi su sistema lineare 4×4
+## 3. Exercise 2 — Jacobi on a 4×4 linear system
 
-### 3.1 Formulazione algebrica e condizione di convergenza
+### 3.1 Algebraic formulation and convergence condition
 
-Questo esercizio applica il metodo di Jacobi descritto in astratto nella sezione 1 a un sistema lineare denso, di piccola dimensione fissata (4 equazioni, 4 incognite), risolto **esattamente** (a meno della tolleranza di convergenza) piuttosto che tramite discretizzazione di un problema continuo. Il sistema è:
+This exercise applies the Jacobi method described abstractly in section 1 to a dense linear system of small, fixed size (4 equations, 4 unknowns), solved **exactly** (up to the convergence tolerance) rather than through the discretization of a continuous problem. The system is:
 
 ```
  10 x₀ -  x₁ + 2 x₂          =   6
@@ -289,18 +289,18 @@ Questo esercizio applica il metodo di Jacobi descritto in astratto nella sezione
         3 x₁ -  x₂ + 8 x₃    =  15
 ```
 
-Verifica della dominanza diagonale stretta per righe (condizione sufficiente di convergenza, sezione 1), riga per riga:
+Verification of strict row-wise diagonal dominance (sufficient convergence condition, section 1), row by row:
 
 ```
-Riga 0: |10| > |-1| + |2|           →  10 > 3    ✓
-Riga 1: |11| > |-1| + |-1| + |3|    →  11 > 5    ✓
-Riga 2: |10| > |2| + |-1| + |-1|    →  10 > 4    ✓
-Riga 3: |8|  > |3| + |-1|           →   8 > 4    ✓
+Row 0: |10| > |-1| + |2|           →  10 > 3    ✓
+Row 1: |11| > |-1| + |-1| + |3|    →  11 > 5    ✓
+Row 2: |10| > |2| + |-1| + |-1|    →  10 > 4    ✓
+Row 3: |8|  > |3| + |-1|           →   8 > 4    ✓
 ```
 
-Tutte le righe soddisfano la condizione, garantendo `ρ(D⁻¹(L+U)) < 1` e quindi convergenza del metodo indipendentemente dal vettore iniziale scelto (tipicamente `x^(0) = 0` in assenza di una stima migliore).
+All rows satisfy the condition, guaranteeing `ρ(D⁻¹(L+U)) < 1` and therefore convergence of the method regardless of the chosen initial vector (typically `x^(0) = 0` in the absence of a better estimate).
 
-Isolando ciascuna incognita sulla propria equazione (equivalente a esplicitare `x = D⁻¹(L+U)x + D⁻¹b` componente per componente, sezione 1):
+Isolating each unknown on its own equation (equivalent to writing out `x = D⁻¹(L+U)x + D⁻¹b` component by component, section 1):
 
 ```
 x₀^(k+1) = ( 6  + x₁^(k) - 2x₂^(k)          ) / 10
@@ -309,22 +309,22 @@ x₂^(k+1) = (-11 - 2x₀^(k) + x₁^(k) + x₃^(k) ) / 10
 x₃^(k+1) = ( 15 - 3x₁^(k) + x₂^(k)          ) / 8
 ```
 
-Si noti, confrontando con la sezione 2.2, che la struttura è identica in natura (ogni incognita è funzione lineare delle altre, pesata dai coefficienti fuori diagonale e normalizzata per il coefficiente diagonale), ma qui la matrice è **densa** (quasi tutti i coefficienti fuori diagonale sono non nulli) anziché sparsa a struttura regolare come nel caso dello stencil a 5 punti: ogni incognita dipende, in generale, da **tutte** le altre, non solo da un piccolo sottoinsieme di "vicini" topologici.
+Note, comparing with section 2.2, that the structure is identical in nature (each unknown is a linear function of the others, weighted by the off-diagonal coefficients and normalized by the diagonal coefficient), but here the matrix is **dense** (nearly all off-diagonal coefficients are non-zero) rather than sparse with regular structure as in the case of the 5-point stencil: each unknown depends, in general, on **all** the others, not just on a small subset of topological "neighbors".
 
-### 3.2 Strategia di parallelizzazione: un'incognita per processo
+### 3.2 Parallelization strategy: one unknown per process
 
-A differenza dell'esercizio 1, dove la parallelizzazione è **spaziale** (ogni processo possiede una porzione contigua del dominio fisico), qui la parallelizzazione è **algebrica**: ogni processo è responsabile del calcolo di una singola incognita del sistema, indipendentemente da qualunque nozione di prossimità spaziale (che, in un sistema lineare denso e astratto, non è nemmeno definita):
+Unlike exercise 1, where the parallelization is **spatial** (each process owns a contiguous portion of the physical domain), here the parallelization is **algebraic**: each process is responsible for computing a single unknown of the system, independently of any notion of spatial proximity (which, in an abstract dense linear system, is not even defined):
 
 ```
-Processo 0 → calcola x₀_new
-Processo 1 → calcola x₁_new
-Processo 2 → calcola x₂_new
-Processo 3 → calcola x₃_new
+Process 0 → computes x₀_new
+Process 1 → computes x₁_new
+Process 2 → computes x₂_new
+Process 3 → computes x₃_new
 ```
 
-Questa corrispondenza 1:1 tra incognite e processi impone un vincolo rigido sul numero di processi con cui l'eseguibile può essere lanciato: **esattamente 4**, pari alla dimensione del sistema. A differenza dell'esercizio 1, dove la decomposizione a strisce si adatta naturalmente a un numero arbitrario di processi P (a patto che `P ≤ N`, e idealmente `N` divisibile per `P` per bilanciare il carico), qui il grado di parallelismo è strutturalmente limitato dalla dimensione del problema stesso: non ha senso lanciare questo eseguibile con un numero di processi diverso da 4, né maggiore (non ci sarebbero incognite aggiuntive da assegnare) né minore (mancherebbero processi per coprire tutte le incognite, nell'assunzione implementativa 1 processo = 1 incognita usata qui).
+This 1:1 correspondence between unknowns and processes imposes a rigid constraint on the number of processes with which the executable can be launched: **exactly 4**, equal to the size of the system. Unlike exercise 1, where the strip decomposition naturally adapts to an arbitrary number of processes P (provided `P ≤ N`, and ideally `N` divisible by `P` to balance the load), here the degree of parallelism is structurally limited by the size of the problem itself: it makes no sense to launch this executable with a number of processes other than 4, either more (there would be no additional unknowns to assign) or fewer (there would not be enough processes to cover all the unknowns, under the implementation assumption of 1 process = 1 unknown used here).
 
-Ogni processo determina quale equazione/incognita gli compete tipicamente tramite uno `switch(rank)` o una struttura condizionale equivalente, dato che i coefficienti di ciascuna equazione sono strutturalmente diversi (non esiste una formula chiusa uniforme parametrizzata dal solo rank, a differenza dell'esercizio 1 dove lo stesso identico stencil si applica a ogni processo, cambiando solo l'intervallo di righe):
+Each process typically determines which equation/unknown it is responsible for through a `switch(rank)` or an equivalent conditional structure, since the coefficients of each equation are structurally different (there is no uniform closed-form formula parameterized solely by the rank, unlike exercise 1 where the exact same stencil is applied by every process, with only the range of rows changing):
 
 ```cpp
 double x_new;
@@ -336,37 +336,37 @@ switch (rank) {
 }
 ```
 
-### 3.3 Pattern di comunicazione: perché Allgather e non halo exchange
+### 3.3 Communication pattern: why Allgather and not halo exchange
 
-Nell'esercizio 1, ogni processo necessita, per aggiornare i propri nodi, esclusivamente dei valori posseduti dai **due** processi topologicamente adiacenti (nord e sud): il pattern di comunicazione è **locale**, e il volume di dati scambiato per processo per iterazione è costante rispetto al numero totale di processi P (dipende solo dalla larghezza N della griglia, non da P). Questo è il motivo per cui l'halo exchange P2P (`MPI_Sendrecv`) è la scelta appropriata: non ha senso, né sarebbe efficiente, forzare una comunicazione collettiva quando ogni processo interagisce strutturalmente solo con un piccolo sottoinsieme fisso degli altri.
+In exercise 1, each process needs, in order to update its own nodes, exclusively the values held by the **two** topologically adjacent processes (north and south): the communication pattern is **local**, and the volume of data exchanged per process per iteration is constant with respect to the total number of processes P (it depends only on the grid width N, not on P). This is why P2P halo exchange (`MPI_Sendrecv`) is the appropriate choice: it would make no sense, nor would it be efficient, to force a collective communication when each process structurally interacts with only a small, fixed subset of the others.
 
-Nell'esercizio 2, invece, la formula di aggiornamento di **ciascuna** incognita (sezione 3.1) coinvolge, in generale, **tutte** le altre incognite del sistema (matrice densa, sezione 3.1): il processo 0, per calcolare `x₀_new`, necessita dei valori correnti di `x₁` e `x₂` (posseduti da altri processi); il processo 1 necessita di `x₀`, `x₂` e `x₃`; e così via. Il pattern di dipendenza dati è quindi **completo** (all-to-all): ogni processo deve rendere disponibile il proprio valore aggiornato a **tutti** gli altri processi prima dell'iterazione successiva, e viceversa deve ricevere il valore aggiornato da tutti gli altri.
+In exercise 2, by contrast, the update formula for **each** unknown (section 3.1) involves, in general, **all** the other unknowns of the system (dense matrix, section 3.1): process 0, to compute `x₀_new`, needs the current values of `x₁` and `x₂` (held by other processes); process 1 needs `x₀`, `x₂`, and `x₃`; and so on. The data dependency pattern is therefore **complete** (all-to-all): every process must make its updated value available to **all** the other processes before the next iteration, and conversely must receive the updated value from all the others.
 
-Implementare questo pattern con comunicazioni P2P esplicite richiederebbe, per ogni processo, l'invio del proprio valore a ciascuno degli altri P-1 processi (e la ricezione simmetrica), per un totale di P·(P-1) messaggi P2P nel communicator — esattamente il pattern generale che la primitiva collettiva `MPI_Alltoall` (guida 03, sezione 7) è progettata per gestire in modo efficiente. In questo caso specifico, tuttavia, ogni processo invia lo **stesso** valore scalare (`x_new` del processo stesso) a tutti gli altri, anziché valori distinti per ciascun destinatario come nel caso generale di `MPI_Alltoall`: questa è esattamente la semantica di `MPI_Allgather` (guida 03, sezione 5), che risulta quindi la primitiva collettiva corretta e più efficiente per questo pattern, preferibile sia a un `MPI_Alltoall` (semanticamente più generale del necessario) sia a una sequenza di comunicazioni P2P scritte manualmente:
+Implementing this pattern with explicit P2P communications would require, for each process, sending its own value to each of the other P-1 processes (and the symmetric receive), for a total of P·(P-1) P2P messages in the communicator — exactly the general pattern that the `MPI_Alltoall` collective primitive (chapter 03, section 7) is designed to handle efficiently. In this specific case, however, every process sends the **same** scalar value (its own `x_new`) to all the others, rather than distinct values for each recipient as in the general case of `MPI_Alltoall`: this is exactly the semantics of `MPI_Allgather` (chapter 03, section 5), which is therefore the correct and most efficient collective primitive for this pattern, preferable both to an `MPI_Alltoall` (semantically more general than necessary) and to a manually written sequence of P2P communications:
 
 ```cpp
-double x_new;   // valore calcolato localmente da QUESTO processo (sezione 3.2)
-double x[4];    // vettore completo delle incognite, replicato su OGNI processo
+double x_new;   // value computed locally by THIS process (section 3.2)
+double x[4];    // complete vector of unknowns, replicated on EVERY process
 
 MPI_Allgather(&x_new, 1, MPI_DOUBLE, x, 1, MPI_DOUBLE, MPI_COMM_WORLD);
-// Dopo questa chiamata, x[i] su OGNI processo contiene il valore x_new
-// calcolato dal processo di rank i, per i = 0..3
+// After this call, x[i] on EVERY process contains the value x_new
+// computed by the process of rank i, for i = 0..3
 ```
 
-Al termine della `MPI_Allgather`, ogni processo possiede una copia locale identica e completa del vettore `x[]` aggiornato, necessaria per calcolare la propria incognita alla successiva iterazione (che, come visto in sezione 3.1, dipende in generale da tutte le componenti del vettore).
+At the end of the `MPI_Allgather`, every process holds an identical, complete local copy of the updated vector `x[]`, needed to compute its own unknown at the next iteration (which, as seen in section 3.1, in general depends on all the components of the vector).
 
-### 3.4 Algoritmo completo per iterazione
+### 3.4 Complete per-iteration algorithm
 
 ```
-Iterazione k:
-  ├── Ogni processo calcola la propria x_new (switch(rank), sezione 3.2)
-  ├── Calcolo local diff = |x_new - x_old|            (nessuna comunicazione)
-  ├── MPI_Allreduce (MPI_MAX)  → max_diff globale       (criterio di convergenza)
-  ├── MPI_Allgather            → distribuzione di x_new a tutti i processi
-  └── Verifica: se max_diff < ε, uscita dal ciclo (identica su ogni processo)
+Iteration k:
+  ├── Each process computes its own x_new (switch(rank), section 3.2)
+  ├── Compute local diff = |x_new - x_old|            (no communication)
+  ├── MPI_Allreduce (MPI_MAX)  → global max_diff       (convergence criterion)
+  ├── MPI_Allgather            → distribution of x_new to all processes
+  └── Check: if max_diff < ε, exit the loop (identical on every process)
 ```
 
-Da notare che, a differenza dell'esercizio 1 dove `MPI_Allreduce` è l'unica collettiva coinvolta, qui sono necessarie **due** collettive distinte per iterazione: `MPI_Allreduce` per il criterio di arresto globale (esattamente lo stesso ruolo della sezione 2.6, applicato qui a un solo scalare per processo anziché a un massimo su una striscia di griglia) e `MPI_Allgather` per la ridistribuzione del vettore delle incognite (che nell'esercizio 1 non ha un analogo diretto: lì la "ridistribuzione" necessaria è solo verso i due vicini topologici, coperta dall'halo exchange P2P, non da una collettiva).
+Note that, unlike exercise 1 where `MPI_Allreduce` is the only collective involved, here **two** distinct collectives are needed per iteration: `MPI_Allreduce` for the global stopping criterion (exactly the same role as in section 2.6, applied here to a single scalar per process rather than to a maximum over a grid strip) and `MPI_Allgather` for redistributing the vector of unknowns (which has no direct analogue in exercise 1: there, the necessary "redistribution" is only toward the two topological neighbors, covered by P2P halo exchange, not by a collective).
 
 ```cpp
 double diff = std::fabs(x_new - x[rank]);
@@ -378,18 +378,18 @@ MPI_Allgather(&x_new, 1, MPI_DOUBLE, x, 1, MPI_DOUBLE, MPI_COMM_WORLD);
 if (max_diff < EPS) break;
 ```
 
-Va osservato l'ordine relativo delle due chiamate: il calcolo di `diff` avviene confrontando `x_new` (valore locale appena calcolato da questo processo) con `x[rank]` (valore della stessa incognita all'iterazione precedente, ancora presente nel vettore `x[]` prima che la `MPI_Allgather` lo sovrascriva) — è quindi necessario calcolare `diff` **prima** della `MPI_Allgather` che aggiorna `x[]`, altrimenti il confronto avverrebbe erroneamente tra `x_new` e se stesso.
+The relative order of the two calls should be noted: the computation of `diff` compares `x_new` (the local value just computed by this process) with `x[rank]` (the value of the same unknown from the previous iteration, still present in the vector `x[]` before the `MPI_Allgather` overwrites it) — it is therefore necessary to compute `diff` **before** the `MPI_Allgather` that updates `x[]`, otherwise the comparison would incorrectly be between `x_new` and itself.
 
-### 3.5 Compilazione, esecuzione e output atteso
+### 3.5 Compilation, execution, and expected output
 
 ```bash
 mpicxx -O2 -Wall -o jacobi_ls Jacobi_linear_system.cpp
 mpirun -np 4 ./jacobi_ls
 ```
 
-> ⚠️ Questo esercizio richiede **esattamente 4 processi** (uno per incognita), per i motivi strutturali discussi in sezione 3.2. Lanciare l'eseguibile con un numero di processi diverso produce un comportamento non definito dal programma stesso (tipicamente un accesso fuori dai casi gestiti dallo `switch(rank)`, oppure un dimensionamento errato dei buffer di `MPI_Allgather`), non un errore rilevato automaticamente da MPI a runtime.
+> ⚠️ This exercise requires **exactly 4 processes** (one per unknown), for the structural reasons discussed in section 3.2. Launching the executable with a different number of processes produces behavior undefined by the program itself (typically an access outside the cases handled by the `switch(rank)`, or incorrect sizing of the `MPI_Allgather` buffers), not an error automatically detected by MPI at runtime.
 
-Il programma scrive la soluzione su `output.dat` (a cura del processo 0, unico responsabile dell'I/O su file per evitare scritture concorrenti da più processi sullo stesso file):
+The program writes the solution to `output.dat` (handled by process 0, the sole process responsible for file I/O, to avoid concurrent writes to the same file from multiple processes):
 
 ```text
 x = 1.00...
@@ -399,26 +399,26 @@ t = 1.00...
 N of iterations : 26
 ```
 
-La soluzione esatta del sistema è `x₀=1, x₁=2, x₂=-1, x₃=1`, verificabile per sostituzione diretta nelle quattro equazioni originali di sezione 3.1. Il numero di iterazioni necessarie per la convergenza (`26`) è sensibilmente inferiore rispetto al tipico numero di iterazioni dell'esercizio 1 (dell'ordine delle migliaia): questo è atteso e coerente con la natura dei due problemi, non un'indicazione di un'implementazione più efficiente. Il sistema 4×4 ha un raggio spettrale della matrice di iterazione `ρ(T)` sensibilmente più piccolo (dominanza diagonale "abbondante", si vedano i margini calcolati in sezione 3.1: ad esempio riga 3, `8 > 4`, un margine del 100% rispetto alla soglia di dominanza) rispetto al laplaciano discretizzato dell'esercizio 1, il cui raggio spettrale si avvicina a 1 tanto più la griglia è fine (sezione 2.8): la velocità di convergenza geometrica del metodo di Jacobi è direttamente governata da `ρ(T)`, non dalla dimensione nominale del problema (4 incognite contro N² incognite).
+The exact solution of the system is `x₀=1, x₁=2, x₂=-1, x₃=1`, verifiable by direct substitution into the four original equations of section 3.1. The number of iterations needed for convergence (`26`) is markedly lower than the typical number of iterations in exercise 1 (on the order of thousands): this is expected and consistent with the nature of the two problems, not an indication of a more efficient implementation. The 4×4 system has a markedly smaller spectral radius `ρ(T)` of the iteration matrix ("abundant" diagonal dominance, see the margins computed in section 3.1: for example row 3, `8 > 4`, a 100% margin over the dominance threshold) compared to the discretized Laplacian of exercise 1, whose spectral radius approaches 1 the finer the grid is (section 2.8): the geometric convergence speed of the Jacobi method is directly governed by `ρ(T)`, not by the nominal size of the problem (4 unknowns vs. N² unknowns).
 
-## 4. Confronto tra le due strategie di parallelizzazione
+## 4. Comparison between the two parallelization strategies
 
-| Aspetto | Esercizio 1 (griglia) | Esercizio 2 (sistema lineare) |
+| Aspect | Exercise 1 (grid) | Exercise 2 (linear system) |
 |---|---|---|
-| Natura del partizionamento | Spaziale (decomposizione del dominio) | Algebrico (decomposizione per incognita) |
-| Scalabilità nel numero di processi | Arbitraria, `P ≤ N` (idealmente `N` divisibile per `P`) | Fissa, `P` deve essere uguale alla dimensione del sistema |
-| Dipendenze dati per l'aggiornamento locale | Solo dai vicini topologici immediati (stencil a 5 punti → 2 vicini in 1D-strips) | Da tutte le altre incognite (matrice densa) |
-| Pattern di comunicazione | P2P mirato (halo exchange, `MPI_Sendrecv`) verso un numero costante di vicini | Collettivo (`MPI_Allgather`) verso tutti i processi |
-| Collettive usate | Solo `MPI_Allreduce` (criterio di convergenza) | `MPI_Allreduce` (convergenza) + `MPI_Allgather` (ridistribuzione dati) |
+| Nature of the partitioning | Spatial (domain decomposition) | Algebraic (decomposition by unknown) |
+| Scalability in the number of processes | Arbitrary, `P ≤ N` (ideally `N` divisible by `P`) | Fixed, `P` must equal the size of the system |
+| Data dependencies for the local update | Only from the immediate topological neighbors (5-point stencil → 2 neighbors in 1D strips) | From all the other unknowns (dense matrix) |
+| Communication pattern | Targeted P2P (halo exchange, `MPI_Sendrecv`) toward a constant number of neighbors | Collective (`MPI_Allgather`) toward all processes |
+| Collectives used | Only `MPI_Allreduce` (convergence criterion) | `MPI_Allreduce` (convergence) + `MPI_Allgather` (data redistribution) |
 
-Il punto concettuale di fondo, utile a generalizzare oltre questi due esercizi specifici: la scelta tra comunicazione P2P mirata e comunicazione collettiva non è arbitraria, ma **discende direttamente dalla struttura delle dipendenze dati** dell'algoritmo. Quando le dipendenze sono **locali/sparse** (ogni unità di calcolo dipende solo da un piccolo sottoinsieme fisso di altre unità, tipicamente per prossimità spaziale o topologica), la comunicazione P2P mirata verso i soli vicini rilevanti è la scelta efficiente, poiché evita di coinvolgere processi che non hanno alcuna dipendenza dati reciproca. Quando le dipendenze sono **globali/dense** (ogni unità di calcolo dipende, in generale, da tutte le altre), una comunicazione collettiva che coinvolge l'intero communicator è invece la scelta corretta, perché il pattern di comunicazione P2P equivalente degenererebbe comunque in un all-to-all completo, che le primitive collettive implementano in modo più efficiente di un'analoga sequenza di chiamate P2P scritte a mano (guida 03, sezione 9).
+The underlying conceptual point, useful for generalizing beyond these two specific exercises: the choice between targeted P2P communication and collective communication is not arbitrary, but **follows directly from the structure of the algorithm's data dependencies**. When the dependencies are **local/sparse** (each computational unit depends only on a small, fixed subset of other units, typically due to spatial or topological proximity), targeted P2P communication toward only the relevant neighbors is the efficient choice, since it avoids involving processes that have no mutual data dependency. When the dependencies are **global/dense** (each computational unit depends, in general, on all the others), a collective communication involving the entire communicator is instead the correct choice, because the equivalent P2P communication pattern would in any case degenerate into a complete all-to-all, which the collective primitives implement more efficiently than an equivalent hand-written sequence of P2P calls (chapter 03, section 9).
 
-## 5. Errori comuni e come evitarli
+## 5. Common mistakes and how to avoid them
 
-| Errore | Causa tipica | Come evitarlo |
+| Mistake | Typical cause | How to avoid it |
 |---|---|---|
-| Deadlock o valori corrotti nelle ghost row | Halo exchange implementato con due `MPI_Send`/`MPI_Recv` bloccanti separati e ordinati in modo non simmetrico tra processi vicini (lo stesso scenario della guida 01a, sezione 6), invece di usare `MPI_Sendrecv` | Usare `MPI_Sendrecv` per l'halo exchange, che gestisce internamente l'ordinamento sicuro di invio/ricezione simultanei; alternativamente, ordinare esplicitamente send/recv come descritto in 01a sezione 6.2 |
-| Crash per accesso fuori dai limiti dell'array nei processi ai bordi della decomposizione (rank 0 o rank P-1) | Codice di halo exchange che assume incondizionatamente l'esistenza di entrambi i vicini nord e sud, senza gestire il caso limite dei processi di bordo | Proteggere le chiamate relative al vicino mancante con una condizionale sul rank, oppure usare `MPI_PROC_NULL` come rank sostitutivo per il vicino inesistente (sezione 2.5) |
-| Il criterio di convergenza globale non si attiva mai, o si attiva in modo incoerente su processi diversi | Uso di `MPI_Reduce` (solo root) invece di `MPI_Allreduce` per il criterio d'arresto, con la decisione di uscita dal ciclo condizionata solo sul processo root, mentre gli altri processi continuano a iterare indefinitamente in attesa di comunicazioni che non arrivano più | Usare sempre `MPI_Allreduce` (non `MPI_Reduce`) quando la decisione di terminare il ciclo deve essere presa in modo identico e autonomo da ogni processo (sezione 2.6) |
-| Esercizio 2 lanciato con un numero di processi diverso da 4 produce risultati insensati o crash silenziosi | Il vincolo "un processo per incognita" (sezione 3.2) non è verificato esplicitamente a runtime dal programma | Aggiungere, in fase di sviluppo, un controllo esplicito a inizio programma (`if (size != 4) { ...termina con messaggio d'errore... }`) invece di affidarsi alla documentazione soltanto |
-| Scrittura concorrente su `output.dat` da più processi, con contenuto del file corrotto o troncato | Ogni processo tenta di scrivere l'intero output su file, invece che un solo processo designato | Delegare l'intera responsabilità dell'output su file a un solo processo (tipicamente il rank 0), proteggendo il blocco di scrittura con `if (rank == 0) { ... }` |
+| Deadlock or corrupted values in the ghost rows | Halo exchange implemented with two separate blocking `MPI_Send`/`MPI_Recv` calls, ordered asymmetrically between neighboring processes (the same scenario as chapter 01a, section 6), instead of using `MPI_Sendrecv` | Use `MPI_Sendrecv` for halo exchange, which internally manages the safe ordering of simultaneous send/receive; alternatively, explicitly order send/recv as described in 01a section 6.2 |
+| Crash due to out-of-bounds array access on the processes at the edges of the decomposition (rank 0 or rank P-1) | Halo exchange code that unconditionally assumes the existence of both the north and south neighbors, without handling the edge case of boundary processes | Guard the calls relating to the missing neighbor with a conditional on the rank, or use `MPI_PROC_NULL` as the substitute rank for the non-existent neighbor (section 2.5) |
+| The global convergence criterion never triggers, or triggers inconsistently on different processes | Use of `MPI_Reduce` (root only) instead of `MPI_Allreduce` for the stopping criterion, with the loop-exit decision conditioned only on the root process, while the other processes keep iterating indefinitely, waiting for communications that no longer arrive | Always use `MPI_Allreduce` (not `MPI_Reduce`) when the decision to terminate the loop must be made identically and independently by every process (section 2.6) |
+| Exercise 2 launched with a number of processes other than 4 produces meaningless results or silent crashes | The "one process per unknown" constraint (section 3.2) is not explicitly verified by the program at runtime | Add, during development, an explicit check at the start of the program (`if (size != 4) { ...terminate with an error message... }`) instead of relying on documentation alone |
+| Concurrent writing to `output.dat` from multiple processes, with corrupted or truncated file contents | Every process attempts to write the full output to file, instead of a single designated process | Delegate full responsibility for file output to a single process (typically rank 0), guarding the write block with `if (rank == 0) { ... }` |
