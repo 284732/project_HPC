@@ -239,9 +239,9 @@ Creates a 2D Cartesian grid with `MPI_Cart_create`. Each process determines its 
 
 ### Exercise 2 — Halo exchange on a grid (`ex2_halo_exchange.cpp`)
 
-Each process exchanges boundary values with its four neighbors using `MPI_Sendrecv`, applying the same communication pattern already seen in chapter 04b (section 2.5) for 1D halo exchange, but generalized to two dimensions: here each process has up to four neighbors (instead of two), corresponding to the four sides of a two-dimensional portion of the domain, rather than just the north/south sides of a 1D strip.
+Each process exchanges boundary values with its four neighbors using `MPI_Sendrecv`, applying the same communication pattern already seen in chapter 03a (section 2.5) for 1D halo exchange, but generalized to two dimensions: here each process has up to four neighbors (instead of two), corresponding to the four sides of a two-dimensional portion of the domain, rather than just the north/south sides of a 1D strip.
 
-**Objective:** generalize the domain decomposition and halo exchange pattern from the 1D strip grid (chapter 04b) to a 2D block decomposition, observing how the use of `MPI_Cart_shift` eliminates the need to manually compute the ranks of the four neighbors (a computation that, in a manually indexed 2D block decomposition, would be significantly more error-prone than in the 1D case due to the double row/column indexing).
+**Objective:** generalize the domain decomposition and halo exchange pattern from the 1D strip grid (chapter 03a) to a 2D block decomposition, observing how the use of `MPI_Cart_shift` eliminates the need to manually compute the ranks of the four neighbors (a computation that, in a manually indexed 2D block decomposition, would be significantly more error-prone than in the 1D case due to the double row/column indexing).
 
 ### Exercise 3 — MPI_Dims_create (`ex3_dims_create.cpp`)
 
